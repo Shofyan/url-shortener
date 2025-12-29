@@ -33,14 +33,15 @@ curl http://localhost:8080/health
 
 - 🚀 Shorten long URLs to compact, shareable links
 - 🔄 Automatic redirection from short to long URLs
-- 🎯 Custom short key support
+- 🎯 Custom short key support (alphanumeric, hyphens, underscores)
 - ⏰ Optional URL expiration
 - 📊 Visit count tracking and statistics
 - 💾 PostgreSQL for persistent storage
 - ⚡ Redis caching for fast redirects
 - 🔒 Rate limiting to prevent abuse
+- 📝 Comprehensive logging for debugging and monitoring
 - 🏗️ Clean Architecture with DDD principles
-- 🐳 Docker support
+- 🐳 Docker support with docker-compose
 
 ## Architecture
 
@@ -279,8 +280,9 @@ The application uses a custom migration system to manage database schema changes
 
 ```
 internal/infrastructure/database/migrations/
-├── 001_create_urls_table.sql        # Initial schema
-└── 002_create_analytics_table.sql   # Analytics tracking
+├── 001_create_urls_table.sql          # Initial schema
+├── 002_create_analytics_table.sql     # Analytics tracking
+└── 003_alter_short_key_length.sql     # Increased short_key to VARCHAR(12)
 ```
 
 ### Running Migrations
@@ -450,27 +452,91 @@ curl http://localhost:8080/health
 
 ### Create Short URL
 
+**Create a short URL with auto-generated key:**
+
 ```bash
 POST /api/shorten
 Content-Type: application/json
 
 {
-  "long_url": "https://example.com/very/long/url",
-  "custom_key": "mylink",  // optional
-  "expires_in": 86400      // optional, in seconds
+  "long_url": "https://example.com/very/long/url"
 }
 ```
 
 Response:
 ```json
 {
-  "short_url": "http://localhost:8080/abc123",
-  "short_key": "abc123",
+  "short_url": "http://localhost:8080/2O994sNdbYu",
+  "short_key": "2O994sNdbYu",
+  "long_url": "https://example.com/very/long/url",
+  "created_at": "2025-12-29T10:00:00Z"
+}
+```
+
+**Create a short URL with custom key:**
+
+```bash
+POST /api/shorten
+Content-Type: application/json
+
+{
+  "long_url": "https://github.com/Shofyan/url-shortener",
+  "custom_key": "my-github"
+}
+```
+
+Response:
+```json
+{
+  "short_url": "http://localhost:8080/my-github",
+  "short_key": "my-github",
+  "long_url": "https://github.com/Shofyan/url-shortener",
+  "created_at": "2025-12-29T10:00:00Z"
+}
+```
+
+**Custom Key Requirements:**
+- ✅ Alphanumeric characters (a-z, A-Z, 0-9)
+- ✅ Hyphens (-) and underscores (_)
+- ✅ Maximum 12 characters
+- ❌ Special characters (!, @, #, $, etc.)
+- ❌ Spaces
+
+**Examples of Valid Custom Keys:**
+- `my-link`
+- `custom_key_123`
+- `MyCustomURL`
+- `test-2024`
+- `user_profile`
+
+**Create a short URL with expiration:**
+
+```bash
+POST /api/shorten
+Content-Type: application/json
+
+{
+  "long_url": "https://example.com/very/long/url",
+  "custom_key": "temp-link",
+  "expires_in": 86400  // 24 hours in seconds
+}
+```
+
+Response:
+```json
+{
+  "short_url": "http://localhost:8080/temp-link",
+  "short_key": "temp-link",
   "long_url": "https://example.com/very/long/url",
   "created_at": "2025-12-29T10:00:00Z",
   "expires_at": "2025-12-30T10:00:00Z"
 }
 ```
+
+**Important Notes:**
+- Without a custom key, duplicate long URLs return the existing short URL
+- With a custom key, a new short URL is always created (allowing multiple short URLs for the same long URL)
+- Auto-generated keys use Snowflake IDs encoded in Base62 (11 characters)
 
 ### Redirect Short URL
 
@@ -645,9 +711,49 @@ docker run -d --name url-shortener \
   url-shortener
 ### ID Generation: Snowflake + Base62
 
-- **Snowflake**: Generates unique 64-bit IDs (distributed, time-sortable)
-- **Base62**: Encodes IDs into short, URL-safe strings
-- **Benefits**: No collisions, scalable, deterministic
+The URL shortener uses a sophisticated ID generation system:
+
+- **Snowflake Algorithm**: Generates unique 64-bit IDs that are:
+  - Distributed and conflict-free across multiple instances
+  - Time-sortable (IDs increase with time)
+  - High-performance (thousands per second)
+  
+- **Base62 Encoding**: Converts Snowflake IDs into short, URL-safe strings
+  - Character set: `0-9A-Za-z` (62 characters)
+- **Error handling**: Continues operation even if cache fails
+
+### Logging & Monitoring
+
+The application includes comprehensive logging throughout the request lifecycle:
+
+- **Request/Response logging**: All HTTP requests with status, latency, and IP
+- **Error tracking**: Detailed error messages with context
+- **Operation tracing**: Step-by-step logging in critical paths (URL shortening, retrieval)
+- **Performance metrics**: Execution time and bottleneck identification
+
+**Log Format:**
+```
+2025/12/29 03:47:39 [Shorten] Starting URL shortening process for: https://example.com
+2025/12/29 03:47:39 [Shorten] Normalized URL: https://example.com
+2025/12/29 03:47:39 [Shorten] Generated short key: 2O994sNdbYu, ID: 2005485841350135808
+2025/12/29 03:47:39 [Shorten] URL saved successfully to database
+2025/12/29 03:47:39 [POST] /api/shorten | Status: 200 | Latency: 5.602086ms | IP: 172.18.0.1
+```
+  - Typical length: 11 characters
+  - Example: `2005485841350135808` → `2O994sNdbYu`
+  
+- **Benefits**: 
+  - No database lookups needed for ID generation
+  - Zero collision risk
+  - Scalable across multiple servers
+  - Deterministic (same ID always produces same short key)
+
+### Short Key Format
+
+- **Auto-generated**: 11 characters using Base62 encoding of Snowflake IDs
+- **Custom keys**: 1-12 characters, alphanumeric plus hyphens and underscores
+- **Validation**: Ensures keys are URL-safe and meet length requirements
+- **Uniqueness**: Custom keys are checked for conflicts before creation
 
 ### Caching Strategy
 
@@ -804,6 +910,33 @@ netstat -ano | findstr :5432
 
 #### 4. Migrations Not Applied
 
+
+#### 7. Short Key Length Errors
+
+**Error**: `pq: value too long for type character varying(10)`
+
+**Solution**: This means your database schema needs updating:
+```bash
+# Apply the migration to increase short_key length
+docker compose exec postgres psql -U postgres -d urlshortener -c "ALTER TABLE urls ALTER COLUMN short_key TYPE VARCHAR(12);"
+
+# Or rebuild with updated migrations
+docker compose down -v
+docker compose up -d
+```
+
+#### 8. Invalid Short Key Format
+
+**Error**: `invalid short key format`
+
+**Solution**: Custom keys must follow these rules:
+- Only alphanumeric characters (a-z, A-Z, 0-9)
+- Can include hyphens (-) and underscores (_)
+- Maximum 12 characters
+- No spaces or special characters
+
+**Valid examples**: `my-link`, `custom_key`, `Test123`
+**Invalid examples**: `my link`, `key@123`, `special!char`
 **Error**: Migration files exist but `make migrate-status` shows nothing
 
 **Solution**:
