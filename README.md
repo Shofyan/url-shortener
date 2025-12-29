@@ -1,6 +1,9 @@
 # URL Shortener
 
-A high-performance URL shortener service built with Go, following Clean Architecture and Domain-Driven Design (DDD) principles.
+A high-performance URL shortener service built with Go, featuring a modern web UI with HTMX, following Clean Architecture and Domain-Driven Design (DDD) principles.
+
+
+
 
 ## ⚡ Quick Start
 
@@ -11,37 +14,119 @@ Get the application running in 5 minutes:
 git clone https://github.com/Shofyan/url-shortener.git
 cd url-shortener
 
-# 2. Copy environment file
-cp .env.example .env
+# 2. Start with Docker Compose (includes PostgreSQL, Redis, and App)
+docker-compose up -d
 
-# 3. Start Docker containers (PostgreSQL + Redis)
-make docker-up
-
-# 4. Run database migrations
-make migrate
-
-# 5. Start the application
-make run
-
-# 6. Test it!
-curl http://localhost:8080/health
+# 3. Open your browser
+open http://localhost:8080
 ```
 
-🎉 The API is now running at `http://localhost:8080`
+🎉 The application is now running at `http://localhost:8080`
+
+**What's Included:**
+- 🌐 **Modern Web UI** - Beautiful, dark-themed interface built with HTMX
+- 🔌 **REST API** - Full-featured API for programmatic access
+- 💾 **PostgreSQL** - Persistent data storage
+- ⚡ **Redis** - High-speed caching layer
+
+## 🎨 Web Interface
+
+The URL Shortener includes a beautiful, modern web interface built with HTMX that provides a seamless user experience without any page reloads.
+
+### Screenshots
+
+**Shorten URL Interface:**
+
+![URL Shortener Main Interface](doc/url-shortener.png)
+
+**Statistics Dashboard:**
+
+![URL Statistics Dashboard](doc/url-shortener-stats.png)
+
+### Key Features
+
+#### 🔗 Shorten URLs Tab
+- **Long URL Input**: Paste any URL to shorten
+- **Custom Keys**: Create memorable short links (optional)
+  - Supports: letters, numbers, hyphens, underscores
+  - Max length: 12 characters
+  - Example: `my-custom-link`, `github_profile`
+- **Expiration**: Set time-to-live in seconds (default: 24 hours)
+- **One-Click Results**: 
+  - Displays shortened URL with copy button
+  - Shows creation time and expiration
+  - Auto-saves to recent URLs list
+
+#### 📊 Get Statistics Tab
+- Enter any short key to view detailed stats
+- **Visual Indicators**:
+  - 👁️ Visit count with emoji
+  - 📅 Creation date and time
+  - ⏰ Expiration info with countdown
+  - 🎯 Special message for unvisited URLs
+  - ⚠️ Red border for expired links
+- **Smart Display**:
+  - Shows "Never" for non-expiring URLs (♾️)
+  - Calculates time remaining (e.g., "23h 45m left")
+  - Clickable URLs for quick testing
+
+#### 📝 Recent URLs Section
+- Automatically tracks your last 5 shortened URLs
+- Stored locally in browser (no server storage)
+- Quick actions:
+  - 📋 Copy URL button
+  - 📊 View stats button
+- Shows shortened key and original URL
+
+### Design Highlights
+
+- **Dark Theme**: Modern, eye-friendly color scheme
+  - Deep blue background (#0f172a)
+  - Purple accent colors (#6366f1)
+  - Smooth gradients and shadows
+- **Responsive Layout**: Perfect on desktop, tablet, and mobile
+- **Smooth Animations**: Fade-ins, slide-ins, and transitions
+- **Real-time Feedback**: Toast notifications for all actions
+- **No Full Reloads**: HTMX handles all interactions seamlessly
+
+### Usage Example
+
+1. **Visit** http://localhost:8080
+2. **Enter** your long URL (e.g., `https://www.example.com/very/long/url/path`)
+3. **Optional**: Add a custom key like `my-link`
+4. **Optional**: Set expiration time (e.g., `3600` for 1 hour)
+5. **Click** "Shorten URL" 🚀
+6. **Copy** your new short URL with one click 📋
+7. **Share** it anywhere!
+
+To check stats later:
+1. **Switch** to "Get Statistics" tab
+2. **Enter** your short key (e.g., `my-link`)
+3. **View** detailed analytics 📈
 
 ## Features
 
+### User Interface
+- 🎨 **Modern Dark Theme UI** - Beautiful, responsive design with HTMX
+- 📱 **Mobile Responsive** - Works seamlessly on all devices
+- ⚡ **Real-time Updates** - No page refreshes required
+- 📋 **One-Click Copy** - Copy short URLs and keys instantly
+- 📝 **Recent URLs** - Track your last 5 shortened URLs locally
+- 🎯 **Visual Stats** - Beautiful statistics visualization with emoji icons
+- 🔔 **Toast Notifications** - Instant feedback for all actions
+
+### API Features
 - 🚀 Shorten long URLs to compact, shareable links
 - 🔄 Automatic redirection from short to long URLs
 - 🎯 Custom short key support (alphanumeric, hyphens, underscores)
-- ⏰ Optional URL expiration
-- 📊 Visit count tracking and statistics
+- ⏰ Optional URL expiration with time remaining display
+- 📊 Visit count tracking and detailed statistics
 - 💾 PostgreSQL for persistent storage
 - ⚡ Redis caching for fast redirects
 - 🔒 Rate limiting to prevent abuse
 - 📝 Comprehensive logging for debugging and monitoring
 - 🏗️ Clean Architecture with DDD principles
-- 🐳 Docker support with docker-compose
+- 🐳 Full Docker support with docker-compose
 
 ## Architecture
 
@@ -50,6 +135,7 @@ curl http://localhost:8080/health
 ```
 cmd/
   api/                    # Application entry point
+  migrate/                # Database migration tool
 internal/
   domain/                 # Domain Layer (Business Logic)
     entity/              # Domain entities
@@ -66,9 +152,14 @@ internal/
     generator/           # ID generation implementations
   interfaces/             # Interface Layer (API/HTTP)
     http/
-      handler/           # HTTP handlers
+      handler/           # HTTP handlers (API & Web)
       middleware/        # HTTP middleware
       router/            # Route configuration
+web/                      # Web UI (HTMX)
+  templates/             # HTML templates
+  static/                # Static assets
+    css/                 # Stylesheets
+    js/                  # JavaScript files
 ```
 
 ### Key Design Patterns
@@ -81,12 +172,19 @@ internal/
 
 ## Tech Stack
 
+### Backend
 - **Language**: Go 1.21+
 - **Web Framework**: Gin
 - **Database**: PostgreSQL
 - **Cache**: Redis
 - **ID Generation**: Snowflake + Base62 encoding
 - **Configuration**: Viper
+
+### Frontend
+- **UI Framework**: HTMX (https://htmx.org)
+- **Styling**: Custom CSS with modern dark theme
+- **Icons**: Emoji-based visual indicators
+- **Storage**: LocalStorage for recent URLs
 
 ## Getting Started
 
@@ -211,7 +309,7 @@ curl -X POST http://localhost:8080/api/shorten \
   -d '{"long_url": "https://example.com/very/long/url"}'
 ```
 
-### Full Docker Stack (Optional)
+### Full Docker Stack (Recommended for Production)
 
 To run everything including the app in Docker:
 
@@ -220,11 +318,22 @@ To run everything including the app in Docker:
 docker-compose up -d
 
 # View logs
-make docker-logs
+docker-compose logs -f
+
+# Or specific service logs
+docker-compose logs -f app
 
 # Stop all services
-make docker-down
+docker-compose down
+
+# Stop and remove volumes (clears all data)
+docker-compose down -v
 ```
+
+The application will be available at:
+- 🌐 **Web UI**: http://localhost:8080
+- 🔌 **API**: http://localhost:8080/api
+- ❤️ **Health Check**: http://localhost:8080/health
 
 ### Stopping the Application
 
@@ -440,6 +549,29 @@ make docker-down
 ```
 
 ## API Endpoints
+
+### Using the Web Interface
+
+The easiest way to use the URL shortener is through the web interface:
+
+1. **Open your browser** and go to http://localhost:8080
+2. **Shorten URLs:**
+   - Enter your long URL
+   - Optionally add a custom key
+   - Set expiration time (default: 24 hours)
+   - Click "Shorten URL"
+3. **View Statistics:**
+   - Click the "Get Statistics" tab
+   - Enter a short key
+   - See detailed stats with visual indicators
+
+**Web UI Features:**
+- 📋 One-click copy for URLs and keys
+- 📝 Tracks your last 5 shortened URLs locally
+- 🎯 Beautiful statistics visualization
+- ⏰ Shows time remaining until expiration
+- 👁️ Visit count with emoji indicators
+- 🔔 Real-time notifications
 
 ### Testing the API
 
