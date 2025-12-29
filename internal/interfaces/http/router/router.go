@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRouter configures all routes and middleware
-func SetupRouter(urlHandler *handler.URLHandler, rateLimiter *middleware.RateLimiter) *gin.Engine {
+func SetupRouter(urlHandler *handler.URLHandler, webHandler *handler.WebHandler, rateLimiter *middleware.RateLimiter) *gin.Engine {
 	// Set Gin to release mode in production
 	// gin.SetMode(gin.ReleaseMode)
 
@@ -17,6 +17,15 @@ func SetupRouter(urlHandler *handler.URLHandler, rateLimiter *middleware.RateLim
 	router.Use(middleware.Recovery())
 	router.Use(middleware.Logger())
 	router.Use(middleware.CORS())
+
+	// Load HTML templates
+	router.LoadHTMLGlob("web/templates/*")
+
+	// Serve static files
+	router.Static("/static", "web/static")
+
+	// Web UI routes
+	router.GET("/", webHandler.Index)
 
 	// Health check endpoint (no rate limiting)
 	router.GET("/health", urlHandler.HealthCheck)

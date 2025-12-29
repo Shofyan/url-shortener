@@ -80,12 +80,13 @@ func main() {
 
 	// Initialize handlers
 	urlHandler := handler.NewURLHandler(shortenUseCase)
+	webHandler := handler.NewWebHandler()
 
 	// Initialize middleware
 	rateLimiter := middleware.NewRateLimiter(cfg.App.RateLimitRequests, cfg.App.RateLimitRequests)
 
 	// Setup router
-	r := router.SetupRouter(urlHandler, rateLimiter)
+	r := router.SetupRouter(urlHandler, webHandler, rateLimiter)
 
 	// Create HTTP server
 	srv := &http.Server{

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .title }}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/json-enc.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ URL Shortener</h1>
+            <p class="subtitle">Transform your long URLs into short, shareable links</p>
+        </header>
+
+        <!-- Notification Area -->
+        <div id="notification" class="notification"></div>
+
+        <!-- Main Card -->
+        <div class="card">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('shorten')">
+                    <span class="tab-icon">🔗</span>
+                    Shorten URL
+                </button>
+                <button class="tab-btn" onclick="switchTab('stats')">
+                    <span class="tab-icon">📊</span>
+                    Get Statistics
+                </button>
+            </div>
+
+            <!-- Shorten URL Form -->
+            <div id="shorten-tab" class="tab-content active">
+                <form id="shorten-form"
+                      hx-post="/api/shorten"
+                      hx-ext="json-enc"
+                      hx-target="#result"
+                      hx-swap="innerHTML"
+                      hx-on::after-request="handleShortenResponse(event)">
+                    
+                    <div class="form-group">
+                        <label for="long_url">
+                            <span class="label-icon">🌐</span>
+                            Long URL
+                        </label>
+                        <input type="url" 
+                               id="long_url" 
+                               name="long_url" 
+                               placeholder="https://example.com/very/long/url/path" 
+                               required
+                               class="input-field">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="custom_key">
+                                <span class="label-icon">✏️</span>
+                                Custom Key (Optional)
+                            </label>
+                            <input type="text" 
+                                   id="custom_key" 
+                                   name="custom_key" 
+                                   placeholder="my-custom-link"
+                                   pattern="[a-zA-Z0-9-_]+"
+                                   class="input-field">
+                            <small class="help-text">Only letters, numbers, dash and underscore</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="expires_in">
+                                <span class="label-icon">⏰</span>
+                                Expires In (seconds)
+                            </label>
+                            <input type="number" 
+                                   id="expires_in" 
+                                   name="expires_in" 
+                                   placeholder="3600"
+                                   value="86400"
+                                   min="0"
+                                   class="input-field">
+                            <small class="help-text">Leave empty for no expiration (Default: 24 hours)</small>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-icon">🚀</span>
+                        Shorten URL
+                    </button>
+                </form>
+
+                <!-- Result Area -->
+                <div id="result" class="result-area"></div>
+            </div>
+
+            <!-- Get Statistics Form -->
+            <div id="stats-tab" class="tab-content">
+                <form id="stats-form"
+                      hx-target="#stats-result"
+                      hx-swap="innerHTML"
+                      hx-on::after-request="handleStatsResponse(event)"
+                      onsubmit="return submitStatsForm(event)">
+                    
+                    <div class="form-group">
+                        <label for="short_key">
+                            <span class="label-icon">🔑</span>
+                            Short Key
+                        </label>
+                        <input type="text" 
+                               id="short_key" 
+                               name="short_key" 
+                               placeholder="abc123" 
+                               required
+                               class="input-field">
+                        <small class="help-text">Enter the short key from your shortened URL</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-icon">📈</span>
+                        Get Statistics
+                    </button>
+                </form>
+
+                <!-- Stats Result Area -->
+                <div id="stats-result" class="result-area"></div>
+            </div>
+        </div>
+
+        <!-- Recent URLs Section -->
+        <div class="card recent-urls" id="recent-urls-section" style="display: none;">
+            <h3>
+                <span class="label-icon">📝</span>
+                Recent URLs
+            </h3>
+            <div id="recent-urls-list"></div>
+        </div>
+
+        <footer>
+            <p>Built with ❤️ using HTMX & Go</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
