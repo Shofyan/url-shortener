@@ -84,10 +84,11 @@ func (s *ShortKey) Value() string {
 // isAlphanumeric checks if a string contains only alphanumeric characters, hyphens, and underscores
 func isAlphanumeric(s string) bool {
 	for _, char := range s {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_') {
+		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') && (char < '0' || char > '9') && char != '-' && char != '_' {
 			return false
 		}
 	}
+
 	return true
 }
 

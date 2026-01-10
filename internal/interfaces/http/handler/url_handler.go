@@ -43,7 +43,8 @@ func (h *URLHandler) ShortenURL(c *gin.Context) {
 			errorCode = "custom_key_exists"
 		default:
 			// Log the actual error for debugging
-			c.Error(err)
+			_ = c.Error(err)
+
 		}
 
 		c.JSON(statusCode, dto.ErrorResponse{
