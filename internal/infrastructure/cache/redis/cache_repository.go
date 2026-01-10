@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// ErrCacheMiss is returned when a key is not found in the cache
 	ErrCacheMiss = errors.New("cache miss")
 )
 

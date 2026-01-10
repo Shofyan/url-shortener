@@ -1,4 +1,4 @@
-// Package url_shortener provides a high-performance URL shortening service built with Go.
+// Package urlshortener provides a high-performance URL shortening service built with Go.
 //
 // This service allows users to shorten long URLs into compact, shareable links and provides
 // analytics for tracking click statistics. The service is built using clean architecture

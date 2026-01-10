@@ -8,10 +8,12 @@ import (
 
 	"github.com/Shofyan/url-shortener/internal/domain/entity"
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
+	// Import postgres driver for database/sql
 	_ "github.com/lib/pq"
 )
 
 var (
+	// ErrNotFound is returned when a URL is not found in the database
 	ErrNotFound = errors.New("URL not found")
 )
 

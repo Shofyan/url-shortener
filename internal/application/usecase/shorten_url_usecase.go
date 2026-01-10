@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	// ErrURLNotFound is returned when the requested URL is not found in the system
 	ErrURLNotFound     = errors.New("URL not found")
 	ErrURLExpired      = errors.New("URL has expired")
 	ErrCustomKeyExists = errors.New("custom short key already exists")
