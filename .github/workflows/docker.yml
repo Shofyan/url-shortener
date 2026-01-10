@@ -43,3 +43,8 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener:${{ steps.vars.outputs.VERSION }}
+          labels: |
+            org.opencontainers.image.title=url-shortener
+            org.opencontainers.image.description=High-performance Go URL shortener
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
