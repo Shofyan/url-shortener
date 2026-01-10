@@ -8,6 +8,7 @@ import (
 
 	"github.com/Shofyan/url-shortener/internal/domain/entity"
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
+
 	// Import postgres driver for database/sql
 	_ "github.com/lib/pq"
 )
