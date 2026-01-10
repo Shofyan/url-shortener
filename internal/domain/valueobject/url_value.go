@@ -8,7 +8,8 @@ import (
 
 var (
 	// ErrInvalidURL is returned when the provided URL format is invalid
-	ErrInvalidURL      = errors.New("invalid URL format")
+	ErrInvalidURL = errors.New("invalid URL format")
+	// ErrEmptyURL is returned when the provided URL is empty
 	ErrEmptyURL        = errors.New("URL cannot be empty")
 	ErrURLTooLong      = errors.New("URL exceeds maximum length")
 	ErrInvalidShortKey = errors.New("invalid short key format")
@@ -17,7 +18,8 @@ var (
 
 const (
 	// MaxURLLength defines the maximum allowed length for a URL
-	MaxURLLength      = 2048
+	MaxURLLength = 2048
+	// MaxShortKeyLength defines the maximum allowed length for a short key
 	MaxShortKeyLength = 12
 )
 
