@@ -8,13 +8,14 @@ on:
       - "v*.*.*"
 
 jobs:
+
   integration:
     uses: ./.github/workflows/go.yml
     permissions: 
       contents: read 
       checks: write
 
-  build:
+  build-docker:
     needs: [integration]
     runs-on: ubuntu-latest
 
