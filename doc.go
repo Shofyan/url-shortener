@@ -23,4 +23,4 @@
 // and Snowflake IDs for distributed environments.
 //
 // For more information, visit: https://github.com/Shofyan/url-shortener
-package main
+package urlshortener
