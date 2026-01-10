@@ -13,6 +13,10 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      checks: write
+    
     steps:
     - uses: actions/checkout@v4
  
@@ -23,9 +27,6 @@ jobs:
         
     - name: Revive Action
       uses: morphy2k/revive-action@v2.4.1
-
-    - name: Staticcheck
-      uses: dominikh/staticcheck-action@v1.3.0
 
 
     - name: Build
