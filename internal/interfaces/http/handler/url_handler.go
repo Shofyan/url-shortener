@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -67,6 +68,9 @@ func (h *URLHandler) ShortenURL(c *gin.Context) {
 func (h *URLHandler) RedirectURL(c *gin.Context) {
 	shortKey := c.Param("shortKey")
 
+	log.Printf("[RedirectURL] Processing %s request for short key: %s from %s | User-Agent: %s | Referer: %s",
+		c.Request.Method, shortKey, c.ClientIP(), c.GetHeader("User-Agent"), c.GetHeader("Referer"))
+
 	longURL, err := h.useCase.GetLongURL(c.Request.Context(), shortKey)
 	if err != nil {
 		statusCode := http.StatusNotFound
@@ -85,6 +89,7 @@ func (h *URLHandler) RedirectURL(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[RedirectURL] Redirecting %s to %s", shortKey, longURL)
 	// 302 redirect for temporary redirect (allows tracking)
 	// Use 301 for permanent redirect if tracking is not needed
 	c.Redirect(http.StatusFound, longURL)

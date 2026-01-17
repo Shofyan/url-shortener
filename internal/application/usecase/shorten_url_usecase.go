@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/Shofyan/url-shortener/internal/application/dto"
@@ -30,6 +31,10 @@ type ShortenURLUseCase struct {
 	genService *service.GeneratorService
 	baseURL    string
 	defaultTTL time.Duration
+
+	// Simple deduplication for preventing double counting
+	recentClicks map[string]time.Time
+	clicksMutex  sync.RWMutex
 }
 
 // NewShortenURLUseCase creates a new ShortenURLUseCase.
@@ -40,13 +45,61 @@ func NewShortenURLUseCase(
 	baseURL string,
 	defaultTTL time.Duration,
 ) *ShortenURLUseCase {
-	return &ShortenURLUseCase{
-		urlRepo:    urlRepo,
-		cacheRepo:  cacheRepo,
-		genService: genService,
-		baseURL:    baseURL,
-		defaultTTL: defaultTTL,
+	uc := &ShortenURLUseCase{
+		urlRepo:      urlRepo,
+		cacheRepo:    cacheRepo,
+		genService:   genService,
+		baseURL:      baseURL,
+		defaultTTL:   defaultTTL,
+		recentClicks: make(map[string]time.Time),
+		clicksMutex:  sync.RWMutex{},
 	}
+
+	// Start cleanup goroutine for recent clicks
+	go uc.cleanupRecentClicks()
+
+	return uc
+}
+
+// cleanupRecentClicks periodically removes old entries from recent clicks map.
+func (uc *ShortenURLUseCase) cleanupRecentClicks() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		uc.clicksMutex.Lock()
+
+		cutoff := time.Now().Add(-5 * time.Second)
+		for key, timestamp := range uc.recentClicks {
+			if timestamp.Before(cutoff) {
+				delete(uc.recentClicks, key)
+			}
+		}
+		uc.clicksMutex.Unlock()
+	}
+}
+
+// shouldIncrementVisitCount checks if we should increment visit count based on recent activity.
+func (uc *ShortenURLUseCase) shouldIncrementVisitCount(shortKey string) bool {
+	uc.clicksMutex.Lock()
+	defer uc.clicksMutex.Unlock()
+
+	now := time.Now()
+	key := shortKey
+
+	// Check if we've seen this click recently (within 3 seconds)
+	if lastClick, exists := uc.recentClicks[key]; exists {
+		if now.Sub(lastClick) < 3*time.Second {
+			log.Printf("[shouldIncrementVisitCount] Skipping duplicate click for %s (last click %v ago)",
+				shortKey, now.Sub(lastClick))
+			return false
+		}
+	}
+
+	// Record this click
+	uc.recentClicks[key] = now
+
+	return true
 }
 
 // Shorten creates a short URL from a long URL.
@@ -235,6 +288,8 @@ func (uc *ShortenURLUseCase) cacheURL(ctx context.Context, shortKey *valueobject
 // This implements the "Lazy Validation" pattern - expiration is checked logically
 // without performing synchronous deletes on the read path.
 func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string) (string, error) {
+	log.Printf("[GetLongURL] Processing request for short key: %s", shortKeyStr)
+
 	shortKey, err := valueobject.NewShortKey(shortKeyStr)
 	if err != nil {
 		return "", err
@@ -246,9 +301,12 @@ func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string)
 	if longURL, err = uc.tryGetFromCache(ctx, shortKey); err != nil {
 		return "", err
 	} else if longURL != "" {
-		// Cache hit - increment visit count once and return
-		if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
-			log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+		log.Printf("[GetLongURL] Cache hit for %s, checking if should increment visit count", shortKey.Value())
+		// Cache hit - increment visit count once if not duplicate
+		if uc.shouldIncrementVisitCount(shortKey.Value()) {
+			if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
+				log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+			}
 		}
 
 		return longURL, nil
@@ -259,9 +317,12 @@ func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string)
 		return "", err
 	}
 
-	// Cache miss resolved - increment visit count once and return
-	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
-		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+	log.Printf("[GetLongURL] Cache miss resolved for %s, checking if should increment visit count", shortKey.Value())
+	// Cache miss resolved - increment visit count once if not duplicate
+	if uc.shouldIncrementVisitCount(shortKey.Value()) {
+		if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
+			log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+		}
 	}
 
 	return longURL, nil
