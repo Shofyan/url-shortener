@@ -97,7 +97,8 @@ jobs:
         echo "- Gocyclo max complexity: 10"
         echo "- Full list in .golangci.yml"
 
-# Security Scanning
+
+ # Security Scanning
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
@@ -119,33 +120,32 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-security-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/*.go') }}
-          restore-keys: |
-            ${{ runner.os }}-go-security-${{ hashFiles('**/go.sum') }}-
-            ${{ runner.os }}-go-security-
-
+      # -----------------------------------------------------------
+      # UPDATED SECTION: Using the official Action
+      # -----------------------------------------------------------
       - name: Run Gosec Security Scanner
-        uses: securecodewarrior/github-action-gosec@master
+        uses: securego/gosec@master
         with:
-          args: '-no-fail -fmt sarif -out results.sarif ./...'
+          # Arguments:
+          # -no-fail: Don't fail the build immediately (let GitHub Security tab handle it)
+          # -fmt sarif: Output format
+          # -out results.sarif: Output filename
+          # ./...: Recursive scan
+          args: -no-fail -fmt sarif -out results.sarif ./...
 
-      - name: Generate text report for artifacts
-        uses: securecodewarrior/github-action-gosec@master
+      # Optional: If you strictly need a text report artifact as well,
+      # you can run it a second time for text output.
+      # (The scan is usually fast enough to run twice).
+      - name: Generate Text Report
+        uses: securego/gosec@master
         with:
-          args: '-no-fail -fmt text -out gosec-report.txt ./...'
-        continue-on-error: true
+           args: -no-fail -fmt text -out gosec-report.txt ./...
 
       - name: Check SARIF file
         run: |
           if [ -f "results.sarif" ]; then
             echo "SARIF file generated successfully"
-            cat results.sarif | head -20
+            head -n 20 results.sarif
           else
             echo "SARIF file not found"
             exit 1
