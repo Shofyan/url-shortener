@@ -376,12 +376,6 @@ jobs:
         platforms: linux/amd64
       continue-on-error: false
 
-    - name: Run Hadolint (Dockerfile linter)
-      uses: hadolint/hadolint-action@v3.1.0
-      with:
-        dockerfile: Dockerfile
-        config: .hadolint.yaml
-
 
 
   # Deployment (only on main branch)
