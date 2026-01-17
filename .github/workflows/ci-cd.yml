@@ -130,24 +130,16 @@ jobs:
             ${{ runner.os }}-go-security-${{ hashFiles('**/go.sum') }}-
             ${{ runner.os }}-go-security-
 
-      - name: Install gosec
-        run: |
-          # Retry mechanism for gosec installation
-          for i in 1 2 3; do
-            if go install github.com/secureco/gosec/v2/cmd/gosec@latest; then
-              break
-            fi
-            echo "Attempt $i failed, retrying..."
-            sleep 5
-          done
-          echo "$HOME/go/bin" >> $GITHUB_PATH
-          gosec --version
-
       - name: Run Gosec Security Scanner
-        run: |
-          gosec -no-fail -fmt sarif -out results.sarif ./...
-          # Also create a text report for fallback
-          gosec -no-fail -fmt text -out gosec-report.txt ./... || true
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out results.sarif ./...'
+
+      - name: Generate text report for artifacts
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: '-no-fail -fmt text -out gosec-report.txt ./...'
+        continue-on-error: true
 
       - name: Check SARIF file
         run: |
