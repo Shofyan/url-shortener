@@ -27,13 +27,12 @@ func Logger() gin.HandlerFunc {
 			}
 		}
 
-		log.Printf("[%s] %s %s | Status: %d | Latency: %v | IP: %s",
+		log.Printf("[%s] %s %s | Status: %d | Latency: %v",
 			c.Request.Method,
 			path,
 			query,
 			c.Writer.Status(),
 			latency,
-			c.ClientIP(),
 		)
 	}
 }

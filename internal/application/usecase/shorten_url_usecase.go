@@ -129,14 +129,17 @@ func (uc *ShortenURLUseCase) Shorten(ctx context.Context, req *dto.ShortenURLReq
 	url.ID = id
 	log.Printf("[Shorten] URL entity created with ID: %d, ShortKey: %s", url.ID, url.ShortKey.Value())
 
-	// Set expiration if provided
-	if req.ExpiresIn > 0 {
-		log.Printf("[Shorten] Setting expiration: %d seconds", req.ExpiresIn)
-		url.SetExpiration(time.Duration(req.ExpiresIn) * time.Second)
-		log.Printf("[Shorten] Expiration set to: %v", url.ExpiresAt)
-	} else {
-		log.Printf("[Shorten] No expiration set")
+	// Set expiration with default 24 hours if not provided
+	const defaultTTLSeconds = 24 * 60 * 60 // 24 hours
+	ttl := req.TTLSeconds
+	if ttl == 0 {
+		ttl = defaultTTLSeconds
+		log.Printf("[Shorten] No TTL specified, using default: %d seconds (24 hours)", defaultTTLSeconds)
 	}
+	
+	log.Printf("[Shorten] Setting expiration: %d seconds", ttl)
+	url.SetExpiration(time.Duration(ttl) * time.Second)
+	log.Printf("[Shorten] Expiration set to: %v", url.ExpiresAt)
 
 	// Save to database
 	log.Printf("[Shorten] Saving URL to database")

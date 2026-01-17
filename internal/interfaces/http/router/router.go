@@ -15,6 +15,7 @@ func SetupRouter(urlHandler *handler.URLHandler, webHandler *handler.WebHandler,
 
 	// Global middleware
 	router.Use(middleware.Recovery())
+	router.Use(middleware.ProcessingTime())
 	router.Use(middleware.Logger())
 	router.Use(middleware.CORS())
 
@@ -24,25 +25,21 @@ func SetupRouter(urlHandler *handler.URLHandler, webHandler *handler.WebHandler,
 	// Serve static files
 	router.Static("/static", "web/static")
 
-	// Web UI routes
-	router.GET("/", webHandler.Index)
-
 	// Health check endpoint (no rate limiting)
 	router.GET("/health", urlHandler.HealthCheck)
 
-	// API routes with rate limiting
-	api := router.Group("/api")
-	api.Use(rateLimiter.Limit())
-	{
-		// Create short URL
-		api.POST("/shorten", urlHandler.ShortenURL)
+	// URL Creation endpoint (POST /)
+	router.POST("/", rateLimiter.Limit(), urlHandler.ShortenURL)
 
-		// Get URL statistics
-		api.GET("/stats/:shortKey", urlHandler.GetStats)
-	}
+	// Short URL redirect (GET /s/{short_code})
+	router.GET("/s/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
 
-	// Short URL redirect (with rate limiting)
-	router.GET("/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
+	// Stats endpoint (GET /stats/{short_code})
+	router.GET("/stats/:shortKey", urlHandler.GetStats)
+
+	// Web UI routes (serve after API routes to avoid conflicts)
+	router.GET("/web", webHandler.Index)
+	router.GET("/web/*filepath", webHandler.Index)
 
 	return router
 }
