@@ -120,6 +120,20 @@ issues:
         - gocritic
       text: "exitAfterDefer"
 
+  # Directories to exclude
+  exclude-dirs:
+    - vendor
+    - bin
+    - .git
+
+  # Files to exclude
+  exclude-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.gen\\.go$"
+
+  # Make issues output unique by line
+  uniq-by-line: true
+
   # Set maximum number of issues to report (0 = unlimited)
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -145,30 +159,17 @@ run:
   build-tags:
     - integration
 
-  # Directories to skip
-  skip-dirs:
-    - vendor
-    - bin
-    - .git
-
-  # Files to skip
-  skip-files:
-    - ".*\\.pb\\.go$"
-    - ".*\\.gen\\.go$"
-
 # Output configuration
 output:
   # Format of output: colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
 
   # Print lines of code with issue
   print-issued-lines: true
 
   # Print linter name in the end of issue text
   print-linter-name: true
-
-  # Make issues output unique by line
-  uniq-by-line: true
 
   # Sort results by the order defined in `sort-order`
   sort-results: true

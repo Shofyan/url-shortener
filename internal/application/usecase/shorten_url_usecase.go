@@ -223,39 +223,43 @@ func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string)
 		return "", err
 	}
 
+	var longURL string
+
 	// Try cache first
 	if cachedURL, err := uc.cacheRepo.Get(ctx, shortKey.Value()); err == nil && cachedURL != "" {
-		return cachedURL, nil
+		longURL = cachedURL
+	} else {
+		// Fetch from database
+		url, err := uc.urlRepo.FindByShortKey(ctx, shortKey)
+		if err != nil {
+			return "", ErrURLNotFound
+		}
+
+		// Check expiration
+		if url.IsExpired() {
+			_ = uc.urlRepo.Delete(ctx, shortKey)
+			_ = uc.cacheRepo.Delete(ctx, shortKey.Value())
+
+			return "", ErrURLExpired
+		}
+
+		longURL = url.LongURL.Value()
+
+		// Update cache
+		cacheTTL := uc.defaultTTL
+		if url.ExpiresAt != nil {
+			cacheTTL = time.Until(*url.ExpiresAt)
+		}
+
+		_ = uc.cacheRepo.Set(ctx, shortKey.Value(), longURL, cacheTTL)
 	}
 
-	// Fetch from database
-	url, err := uc.urlRepo.FindByShortKey(ctx, shortKey)
-	if err != nil {
-		return "", ErrURLNotFound
-	}
-
-	// Check expiration
-	if url.IsExpired() {
-		_ = uc.urlRepo.Delete(ctx, shortKey)
-		_ = uc.cacheRepo.Delete(ctx, shortKey.Value())
-
-		return "", ErrURLExpired
-	}
-
-	// Thread-safe increment visit count and update last accessed time
+	// Always increment visit count regardless of cache hit/miss
 	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
 		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
 	}
 
-	// Update cache
-	cacheTTL := uc.defaultTTL
-	if url.ExpiresAt != nil {
-		cacheTTL = time.Until(*url.ExpiresAt)
-	}
-
-	_ = uc.cacheRepo.Set(ctx, shortKey.Value(), url.LongURL.Value(), cacheTTL)
-
-	return url.LongURL.Value(), nil
+	return longURL, nil
 }
 
 // GetStats retrieves statistics for a short URL.

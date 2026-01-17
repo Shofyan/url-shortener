@@ -80,7 +80,9 @@ function handleShortenResponse(event) {
             shortKey: response.short_key,
             shortUrl: shortUrl,
             longUrl: response.long_url,
-            createdAt: response.created_at
+            createdAt: response.created_at,
+            expiresAt: response.expires_at,
+            visitCount: 0 // New URLs start with 0 visits
         });
 
         // Show success notification
@@ -153,6 +155,7 @@ function displayStatsResult(response) {
 
     const expiresDate = response.expires_at ? new Date(response.expires_at) : null;
     const createdDate = new Date(response.created_at);
+    const lastAccessedDate = response.last_accessed_at ? new Date(response.last_accessed_at) : null;
     const now = new Date();
     const isExpired = expiresDate && expiresDate < now;
 
@@ -166,6 +169,25 @@ function displayStatsResult(response) {
             timeRemaining = `${hours}h ${minutes}m`;
         } else {
             timeRemaining = 'Expired';
+        }
+    }
+
+    // Calculate time since last access
+    let lastAccessInfo = '';
+    if (lastAccessedDate) {
+        const timeSinceAccess = now - lastAccessedDate;
+        const daysSince = Math.floor(timeSinceAccess / (1000 * 60 * 60 * 24));
+        const hoursSince = Math.floor(timeSinceAccess / (1000 * 60 * 60));
+        const minutesSince = Math.floor(timeSinceAccess / (1000 * 60));
+
+        if (daysSince > 0) {
+            lastAccessInfo = `${daysSince} day${daysSince > 1 ? 's' : ''} ago`;
+        } else if (hoursSince > 0) {
+            lastAccessInfo = `${hoursSince} hour${hoursSince > 1 ? 's' : ''} ago`;
+        } else if (minutesSince > 0) {
+            lastAccessInfo = `${minutesSince} minute${minutesSince > 1 ? 's' : ''} ago`;
+        } else {
+            lastAccessInfo = 'Just now';
         }
     }
 
@@ -204,6 +226,21 @@ function displayStatsResult(response) {
                     <span class="stat-label">Created</span>
                     <span class="stat-label" style="font-size: 0.75rem; opacity: 0.7;">${createdDate.toLocaleTimeString()}</span>
                 </div>
+
+                ${lastAccessedDate ? `
+                    <div class="stat-box">
+                        <span class="stat-value" style="font-size: 2.5rem;">🔗</span>
+                        <span class="stat-value" style="font-size: 1.2rem;">${lastAccessedDate.toLocaleDateString()}</span>
+                        <span class="stat-label">Last Accessed</span>
+                        <span class="stat-label" style="font-size: 0.8rem; color: var(--text-secondary);">${lastAccessInfo}</span>
+                    </div>
+                ` : response.visit_count > 0 ? `
+                    <div class="stat-box">
+                        <span class="stat-value" style="font-size: 2.5rem;">🔗</span>
+                        <span class="stat-value" style="font-size: 1.2rem;">Unknown</span>
+                        <span class="stat-label">Last Accessed</span>
+                    </div>
+                ` : ''}
 
                 ${expiresDate ? `
                     <div class="stat-box ${isExpired ? 'stat-box-expired' : ''}">
@@ -246,20 +283,61 @@ function displayStatsError(error) {
 
 // Copy to clipboard
 function copyToClipboard(text, button) {
-    navigator.clipboard.writeText(text).then(() => {
-        const originalText = button.innerHTML;
-        button.innerHTML = '✓ Copied!';
-        button.classList.add('copied');
+    // Try using the modern clipboard API first
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = button.innerHTML;
+            button.innerHTML = '✓ Copied!';
+            button.classList.add('copied');
 
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.classList.remove('copied');
-        }, 2000);
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.classList.remove('copied');
+            }, 2000);
 
-        showNotification('Copied to clipboard! 📋', 'success');
-    }).catch(err => {
+            showNotification('Copied to clipboard! 📋', 'success');
+        }).catch(err => {
+            // Fallback to older method
+            fallbackCopyToClipboard(text, button);
+        });
+    } else {
+        // Use fallback method for non-HTTPS contexts
+        fallbackCopyToClipboard(text, button);
+    }
+}
+
+// Fallback copy method for older browsers or non-HTTPS contexts
+function fallbackCopyToClipboard(text, button) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            const originalText = button.innerHTML;
+            button.innerHTML = '✓ Copied!';
+            button.classList.add('copied');
+
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.classList.remove('copied');
+            }, 2000);
+
+            showNotification('Copied to clipboard! 📋', 'success');
+        } else {
+            throw new Error('Copy command failed');
+        }
+    } catch (err) {
         showNotification('Failed to copy to clipboard', 'error');
-    });
+    } finally {
+        document.body.removeChild(textArea);
+    }
 }
 
 // Show notification
@@ -293,28 +371,84 @@ function displayRecentURLs() {
     const list = document.getElementById('recent-urls-list');
 
     if (recentUrls.length === 0) {
-        section.style.display = 'none';
+        list.innerHTML = '<div class="no-recent-urls">No recent URLs yet. Create your first shortened URL above! 🚀</div>';
         return;
     }
 
-    section.style.display = 'block';
+    list.innerHTML = recentUrls.map(url => {
+        const createdDate = new Date(url.createdAt);
+        const expiresDate = url.expiresAt ? new Date(url.expiresAt) : null;
+        const now = new Date();
+        const isExpired = expiresDate && expiresDate < now;
 
-    list.innerHTML = recentUrls.map(url => `
-        <div class="recent-url-item">
-            <div class="recent-url-info">
-                <a href="${url.shortUrl}" class="recent-short-url" target="_blank">${url.shortKey}</a>
-                <div class="recent-long-url" title="${url.longUrl}">${url.longUrl}</div>
+        // Calculate time since creation
+        const timeDiff = now - createdDate;
+        const minutes = Math.floor(timeDiff / 60000);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        let timeAgo;
+        if (days > 0) {
+            timeAgo = `${days} day${days > 1 ? 's' : ''} ago`;
+        } else if (hours > 0) {
+            timeAgo = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        } else if (minutes > 0) {
+            timeAgo = `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+        } else {
+            timeAgo = 'Just now';
+        }
+
+        // Calculate expiration info
+        let expirationInfo = '';
+        if (expiresDate) {
+            if (isExpired) {
+                expirationInfo = '<span class="expired-badge">⚠️ Expired</span>';
+            } else {
+                const timeToExpire = expiresDate - now;
+                const expireHours = Math.floor(timeToExpire / (1000 * 60 * 60));
+                const expireDays = Math.floor(expireHours / 24);
+
+                if (expireDays > 0) {
+                    expirationInfo = `<span class="expire-info">⏳ Expires in ${expireDays} day${expireDays > 1 ? 's' : ''}</span>`;
+                } else if (expireHours > 0) {
+                    expirationInfo = `<span class="expire-info">⏳ Expires in ${expireHours} hour${expireHours > 1 ? 's' : ''}</span>`;
+                } else {
+                    expirationInfo = '<span class="expire-warning">⚠️ Expires soon</span>';
+                }
+            }
+        }
+
+        return `
+            <div class="recent-url-item ${isExpired ? 'expired' : ''}">
+                <div class="recent-url-header">
+                    <div class="recent-url-main">
+                        <a href="${url.shortUrl}" class="recent-short-url" target="_blank">
+                            <span class="short-key">${url.shortKey}</span>
+                        </a>
+                        <div class="recent-long-url" title="${url.longUrl}">
+                            ${url.longUrl.length > 60 ? url.longUrl.substring(0, 60) + '...' : url.longUrl}
+                        </div>
+                    </div>
+                    <div class="recent-url-actions">
+                        <button class="icon-btn" onclick="copyToClipboard('${url.shortUrl}', this)" title="Copy Short URL">
+                            📋
+                        </button>
+                        <button class="icon-btn" onclick="viewStats('${url.shortKey}')" title="View Statistics">
+                            📊
+                        </button>
+                        <button class="icon-btn" onclick="removeRecentURL('${url.shortKey}')" title="Remove from Recent">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                <div class="recent-url-meta">
+                    <span class="created-time">📅 Created ${timeAgo}</span>
+                    <span class="visit-count">👁️ ${url.visitCount || 0} visits</span>
+                    ${expirationInfo}
+                </div>
             </div>
-            <div class="recent-url-actions">
-                <button class="icon-btn" onclick="copyToClipboard('${url.shortUrl}', this)" title="Copy URL">
-                    📋
-                </button>
-                <button class="icon-btn" onclick="viewStats('${url.shortKey}')" title="View Stats">
-                    📊
-                </button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function viewStats(shortKey) {
@@ -335,9 +469,48 @@ function clearRecentURLs() {
     showNotification('Recent URLs cleared', 'success');
 }
 
+function removeRecentURL(shortKey) {
+    let recentUrls = JSON.parse(localStorage.getItem('recentUrls') || '[]');
+    recentUrls = recentUrls.filter(url => url.shortKey !== shortKey);
+    localStorage.setItem('recentUrls', JSON.stringify(recentUrls));
+    displayRecentURLs();
+    showNotification('URL removed from recent list', 'success');
+}
+
+// Update visit counts for recent URLs
+async function updateRecentURLStats() {
+    const recentUrls = JSON.parse(localStorage.getItem('recentUrls') || '[]');
+    if (recentUrls.length === 0) return;
+
+    let hasUpdates = false;
+
+    for (let url of recentUrls) {
+        try {
+            const response = await fetch(`/stats/${url.shortKey}`);
+            if (response.ok) {
+                const stats = await response.json();
+                if (stats.visit_count !== url.visitCount) {
+                    url.visitCount = stats.visit_count;
+                    hasUpdates = true;
+                }
+            }
+        } catch (error) {
+            // Silently ignore errors
+        }
+    }
+
+    if (hasUpdates) {
+        localStorage.setItem('recentUrls', JSON.stringify(recentUrls));
+        displayRecentURLs();
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     displayRecentURLs();
+
+    // Update visit counts every 30 seconds
+    setInterval(updateRecentURLStats, 30000);
 
     // Pre-process form data before HTMX sends it
     document.body.addEventListener('htmx:configRequest', (event) => {

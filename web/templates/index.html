@@ -77,7 +77,7 @@
                             <input type="number"
                                    id="expires_in"
                                    name="expires_in"
-                                   placeholder="3600"
+                                   placeholder="86400"
                                    value="86400"
                                    min="0"
                                    class="input-field">
@@ -129,10 +129,11 @@
         </div>
 
         <!-- Recent URLs Section -->
-        <div class="card recent-urls" id="recent-urls-section" style="display: none;">
+        <div class="card recent-urls" id="recent-urls-section">
             <h3>
                 <span class="label-icon">📝</span>
                 Recent URLs
+                <button class="clear-btn" onclick="clearRecentURLs()" title="Clear Recent URLs">🗑️ Clear</button>
             </h3>
             <div id="recent-urls-list"></div>
         </div>
