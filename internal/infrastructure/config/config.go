@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config holds all application configuration
+// Config holds all application configuration.
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
@@ -16,7 +16,7 @@ type Config struct {
 	App      AppConfig
 }
 
-// ServerConfig holds server configuration
+// ServerConfig holds server configuration.
 type ServerConfig struct {
 	Port         string
 	ReadTimeout  time.Duration
@@ -24,7 +24,7 @@ type ServerConfig struct {
 	IdleTimeout  time.Duration
 }
 
-// DatabaseConfig holds database configuration
+// DatabaseConfig holds database configuration.
 type DatabaseConfig struct {
 	Host            string
 	Port            string
@@ -37,7 +37,7 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration
 }
 
-// RedisConfig holds Redis configuration
+// RedisConfig holds Redis configuration.
 type RedisConfig struct {
 	Host         string
 	Port         string
@@ -47,7 +47,7 @@ type RedisConfig struct {
 	MinIdleConns int
 }
 
-// AppConfig holds application-specific configuration
+// AppConfig holds application-specific configuration.
 type AppConfig struct {
 	BaseURL           string
 	CacheTTL          time.Duration
@@ -56,7 +56,7 @@ type AppConfig struct {
 	RateLimitWindow   time.Duration
 }
 
-// Load loads configuration from file and environment variables
+// Load loads configuration from file and environment variables.
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -118,13 +118,13 @@ func setDefaults() {
 	viper.SetDefault("app.ratelimitwindow", "1m")
 }
 
-// GetDSN returns the PostgreSQL connection string
+// GetDSN returns the PostgreSQL connection string.
 func (c *DatabaseConfig) GetDSN() string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode)
 }
 
-// GetRedisAddr returns the Redis address
+// GetRedisAddr returns the Redis address.
 func (c *RedisConfig) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%s", c.Host, c.Port)
 }

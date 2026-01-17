@@ -1,16 +1,16 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"github.com/Shofyan/url-shortener/internal/interfaces/http/handler"
 	"github.com/Shofyan/url-shortener/internal/interfaces/http/middleware"
-	"github.com/gin-gonic/gin"
 )
 
-// SetupRouter configures all routes and middleware
+// SetupRouter configures all routes and middleware.
 func SetupRouter(urlHandler *handler.URLHandler, webHandler *handler.WebHandler, rateLimiter *middleware.RateLimiter) *gin.Engine {
 	// Set Gin to release mode in production
 	// gin.SetMode(gin.ReleaseMode)
-
 	router := gin.New()
 
 	// Global middleware

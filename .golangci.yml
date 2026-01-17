@@ -1,0 +1,174 @@
+linters:
+  enable:
+    # Enable specific linters as mentioned in requirements
+    - gocyclo        # Cyclomatic complexity checker
+    - revive         # Fast, configurable, extensible, flexible, and beautiful linter for Go
+
+    # Additional recommended linters for production code
+    - errcheck       # Check for unchecked errors
+    - gosimple       # Simplify code
+    - govet          # Vet examines Go source code
+    - ineffassign    # Detect ineffectual assignments
+    - staticcheck    # Go static analysis
+    - typecheck      # Type check Go code
+    - unused         # Check for unused constants, variables, functions and types
+    - misspell       # Find commonly misspelled English words
+    - unconvert      # Remove unnecessary type conversions
+    - unparam        # Report unused function parameters
+    - gosec          # Security checker
+    - gocritic       # Comprehensive Go linter
+    - gofmt          # Check whether code was gofmt-ed
+    - goimports      # Check import statements are formatted according to the 'goimports' command
+    - gomodguard     # Check for blocked dependencies
+    - godot          # Check if comments end in a period
+    - whitespace     # Check for unnecessary whitespaces
+    - wsl            # Whitespace linter
+
+linters-settings:
+  gocyclo:
+    # Maximum cyclomatic complexity per function (requirement: max 10)
+    min-complexity: 10
+
+  revive:
+    # Minimum confidence for issues (0.0 to 1.0)
+    confidence: 0.8
+    severity: warning
+    rules:
+      # Enable important rules
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+        arguments:
+          - "checkPrivateReceivers"
+          - "sayRepetitiveInsteadOfStutters"
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-naming
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  gosec:
+    # Exclude certain rules that may not be relevant for this project
+    excludes:
+      - G104 # Audit errors not checked - we have errcheck for this
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport # Handled by goimports
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/Shofyan/url-shortener
+
+issues:
+  # Exclude some linter issues for test files
+  exclude-rules:
+    # Disable some linters for test files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - gocritic
+
+    # Disable certain rules for generated files
+    - path: ".*\\.pb\\.go"
+      linters:
+        - all
+
+    # Disable certain rules for vendor directory
+    - path: vendor/.*
+      linters:
+        - all
+
+    # Allow long lines in some cases
+    - linters:
+        - lll
+      source: "^//go:generate "
+
+    # Exclude exitAfterDefer from main functions since it's a common pattern
+    - path: "cmd/.*/main\\.go"
+      linters:
+        - gocritic
+      text: "exitAfterDefer"
+
+  # Set maximum number of issues to report (0 = unlimited)
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Show only new issues created in git patch
+  new: false
+
+  # Fix found issues (if it's supported by the linter)
+  fix: false
+
+# Run configuration
+run:
+  # Timeout for analysis
+  timeout: 5m
+
+  # Exit code when at least one issue was found
+  issues-exit-code: 1
+
+  # Include test files in analysis
+  tests: true
+
+  # List of build tags
+  build-tags:
+    - integration
+
+  # Directories to skip
+  skip-dirs:
+    - vendor
+    - bin
+    - .git
+
+  # Files to skip
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.gen\\.go$"
+
+# Output configuration
+output:
+  # Format of output: colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
+  format: colored-line-number
+
+  # Print lines of code with issue
+  print-issued-lines: true
+
+  # Print linter name in the end of issue text
+  print-linter-name: true
+
+  # Make issues output unique by line
+  uniq-by-line: true
+
+  # Sort results by the order defined in `sort-order`
+  sort-results: true

@@ -15,7 +15,7 @@ The objective is to design and implement a URL shortening service that demonstra
 **Endpoint:** `POST /` (Implied)
 
 * **Inputs:**
-* 
+*
 `long_url` (Required): The original URL to be shortened.
 
 
@@ -37,7 +37,7 @@ The objective is to design and implement a URL shortening service that demonstra
 * Generate a unique short code.
 
 
-* 
+*
 **Constraint:** Short codes must exclude `0`, `O`, `l`, and `1` to ensure readability.
 
 
@@ -47,14 +47,14 @@ The objective is to design and implement a URL shortening service that demonstra
 
 ### 2.2 Redirection
 
-**Endpoint:** `GET /s/{short_code}` 
+**Endpoint:** `GET /s/{short_code}`
 
 * **Behavior:**
-* 
+*
 **Active:** If the code exists and is not expired, return `302 Found` and redirect to the `long_url`.
 
 
-* 
+*
 **Inactive:** If the code is nonexistent or expired, return `404 Not Found`.
 
 
@@ -69,14 +69,14 @@ The objective is to design and implement a URL shortening service that demonstra
 
 ### 2.3 Observability Endpoint
 
-**Endpoint:** `GET /stats/{short_code}` 
+**Endpoint:** `GET /stats/{short_code}`
 
 * **Output:** Return a JSON object containing:
 * `long_url`
 * `created_at`
 * `expires_at`
 * `click_count`
-* 
+*
 `last_accessed_at`.
 
 
@@ -96,25 +96,25 @@ The objective is to design and implement a URL shortening service that demonstra
 
 ### 3.1 Observability & Instrumentation
 
-* 
+*
 **Custom Header:** All HTTP responses (Success, Redirect, Error) must include `X-Processing-Time-Micros` indicating internal execution duration in microseconds.
 
 
 
 ### 3.2 Privacy
 
-* 
+*
 **PII Constraint:** Requester IP addresses must **not** be stored in the database or exposed in system logs.
 
 
 
 ### 3.3 Scalability & Performance
 
-* 
+*
 **Readiness:** The architecture must be capable of scaling (via documentation plan) to 10,000 requests per second for redirects.
 
 
-* 
+*
 **Capacity:** The system design should theoretically accommodate 100 million new URLs per month.
 
 
@@ -123,7 +123,7 @@ The objective is to design and implement a URL shortening service that demonstra
 
 ### 4.1 Storage Abstraction
 
-* 
+*
 **In-Memory Allowed:** The implementation may use in-memory storage for this exercise.
 
 
@@ -139,22 +139,22 @@ The objective is to design and implement a URL shortening service that demonstra
 
 ### 4.3 Containerization
 
-* 
+*
 **Docker:** Provide a multi-stage Dockerfile.
 
 
-* 
+*
 **Security:** The container must run as a non-root user.
 
 
 
 ### 4.4 Infrastructure as Code (IaC)
 
-* 
+*
 **Tool:** Terraform (`main.tf`).
 
 
-* 
+*
 **Platform:** AWS or GCP.
 
 
@@ -177,11 +177,11 @@ The objective is to design and implement a URL shortening service that demonstra
 
 A GitHub Actions pipeline must enforce the following:
 
-* 
+*
 **Cyclomatic Complexity:** Max 10 per function.
 
 
-* 
+*
 **Go:** `golangci-lint` (enable `gocyclo`, `revive`).
 
 
@@ -190,34 +190,34 @@ A GitHub Actions pipeline must enforce the following:
 
 ### 5.2 Testing Strategy
 
-* 
+*
 **Concurrency Test:** Prove `click_count` safety under 100+ concurrent requests.
 
 
-* 
+*
 **Deterministic Expiration:** Verify TTL logic using a mocked system clock (no `sleep` allowed).
 
 
-* 
+*
 **Interface Verification:** Tests must target the storage abstraction interface, not the concrete implementation.
 
 
 
 ### 5.3 Documentation
 
-* 
+*
 **Architecture Diagram:** Visual representation of data model and system.
 
 
-* 
+*
 **Gap Analysis:** Why in-memory fails in the defined cloud env and how managed storage fixes it.
 
 
-* 
+*
 **Capacity Planning:** Storage estimates for 12 months.
 
 
-* 
+*
 **SLIs/SLOs:** Define two indicators and objectives, plus one on-call scenario.
 
 

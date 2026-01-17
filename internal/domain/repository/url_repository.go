@@ -7,7 +7,7 @@ import (
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
 )
 
-// URLRepository defines the interface for URL persistence
+// URLRepository defines the interface for URL persistence.
 type URLRepository interface {
 	// Save saves a new URL mapping
 	Save(ctx context.Context, url *entity.URL) error

@@ -38,12 +38,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	log.Println("✓ Connected to PostgreSQL")
+
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.Printf("Failed to close database connection: %v", err)
 		}
 	}()
-	log.Println("✓ Connected to PostgreSQL")
 
 	// Initialize Redis
 	redisClient, err := redis.NewRedisClient(
@@ -57,12 +59,13 @@ func main() {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
+	log.Println("✓ Connected to Redis")
+
 	defer func() {
 		if err := redisClient.Close(); err != nil {
 			log.Printf("Failed to close Redis connection: %v", err)
 		}
 	}()
-	log.Println("✓ Connected to Redis")
 
 	// Initialize repositories
 	urlRepo := postgres.NewURLRepository(db)
@@ -73,6 +76,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Snowflake generator: %v", err)
 	}
+
 	base62Gen := base62.NewGenerator()
 
 	// Initialize domain services
@@ -109,6 +113,7 @@ func main() {
 	// Start server in a goroutine
 	go func() {
 		log.Printf("🚀 Server starting on port %s", cfg.Server.Port)
+
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}

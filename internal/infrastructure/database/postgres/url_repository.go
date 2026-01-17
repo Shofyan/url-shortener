@@ -9,26 +9,26 @@ import (
 	"github.com/Shofyan/url-shortener/internal/domain/entity"
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
 
-	// Import postgres driver for database/sql
+	// Import postgres driver for database/sql.
 	_ "github.com/lib/pq"
 )
 
 var (
-	// ErrNotFound is returned when a URL is not found in the database
+	// ErrNotFound is returned when a URL is not found in the database.
 	ErrNotFound = errors.New("URL not found")
 )
 
-// URLRepository implements the URLRepository interface for PostgreSQL
+// URLRepository implements the URLRepository interface for PostgreSQL.
 type URLRepository struct {
 	db *sql.DB
 }
 
-// NewURLRepository creates a new PostgreSQL URL repository
+// NewURLRepository creates a new PostgreSQL URL repository.
 func NewURLRepository(db *sql.DB) *URLRepository {
 	return &URLRepository{db: db}
 }
 
-// Save saves a new URL mapping
+// Save saves a new URL mapping.
 func (r *URLRepository) Save(ctx context.Context, url *entity.URL) error {
 	query := `
 		INSERT INTO urls (id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at)
@@ -48,7 +48,7 @@ func (r *URLRepository) Save(ctx context.Context, url *entity.URL) error {
 	return err
 }
 
-// FindByShortKey retrieves a URL by its short key
+// FindByShortKey retrieves a URL by its short key.
 func (r *URLRepository) FindByShortKey(ctx context.Context, shortKey *valueobject.ShortKey) (*entity.URL, error) {
 	query := `
 		SELECT id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at
@@ -73,6 +73,7 @@ func (r *URLRepository) FindByShortKey(ctx context.Context, shortKey *valueobjec
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
+
 		return nil, err
 	}
 
@@ -98,7 +99,7 @@ func (r *URLRepository) FindByShortKey(ctx context.Context, shortKey *valueobjec
 	return url, nil
 }
 
-// FindByLongURL retrieves a URL by its long URL
+// FindByLongURL retrieves a URL by its long URL.
 func (r *URLRepository) FindByLongURL(ctx context.Context, longURL *valueobject.LongURL) (*entity.URL, error) {
 	query := `
 		SELECT id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at
@@ -125,6 +126,7 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL *valueobject.
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
+
 		return nil, err
 	}
 
@@ -150,7 +152,7 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL *valueobject.
 	return url, nil
 }
 
-// Update updates an existing URL
+// Update updates an existing URL.
 func (r *URLRepository) Update(ctx context.Context, url *entity.URL) error {
 	query := `
 		UPDATE urls
@@ -181,7 +183,7 @@ func (r *URLRepository) Update(ctx context.Context, url *entity.URL) error {
 	return nil
 }
 
-// Delete deletes a URL by its short key
+// Delete deletes a URL by its short key.
 func (r *URLRepository) Delete(ctx context.Context, shortKey *valueobject.ShortKey) error {
 	query := `DELETE FROM urls WHERE short_key = $1`
 
@@ -202,11 +204,12 @@ func (r *URLRepository) Delete(ctx context.Context, shortKey *valueobject.ShortK
 	return nil
 }
 
-// ExistsByShortKey checks if a short key already exists
+// ExistsByShortKey checks if a short key already exists.
 func (r *URLRepository) ExistsByShortKey(ctx context.Context, shortKey *valueobject.ShortKey) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM urls WHERE short_key = $1)`
 
 	var exists bool
+
 	err := r.db.QueryRowContext(ctx, query, shortKey.Value()).Scan(&exists)
 	if err != nil {
 		return false, err
@@ -215,12 +218,12 @@ func (r *URLRepository) ExistsByShortKey(ctx context.Context, shortKey *valueobj
 	return exists, nil
 }
 
-// IncrementVisitCount atomically increments visit count and updates last_accessed_at
+// IncrementVisitCount atomically increments visit count and updates last_accessed_at.
 func (r *URLRepository) IncrementVisitCount(ctx context.Context, shortKey *valueobject.ShortKey) error {
 	query := `
-		UPDATE urls 
+		UPDATE urls
 		SET visit_count = visit_count + 1,
-			last_accessed_at = CURRENT_TIMESTAMP 
+			last_accessed_at = CURRENT_TIMESTAMP
 		WHERE short_key = $1
 	`
 
@@ -241,7 +244,7 @@ func (r *URLRepository) IncrementVisitCount(ctx context.Context, shortKey *value
 	return nil
 }
 
-// NewDB creates a new database connection
+// NewDB creates a new database connection.
 func NewDB(dsn string, maxOpenConns, maxIdleConns int, connMaxLifetime time.Duration) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

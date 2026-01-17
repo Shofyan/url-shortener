@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// CacheRepository defines the interface for caching operations
+// CacheRepository defines the interface for caching operations.
 type CacheRepository interface {
 	// Set stores a key-value pair with TTL
 	Set(ctx context.Context, key string, value string, ttl time.Duration) error

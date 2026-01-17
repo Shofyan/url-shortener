@@ -52,7 +52,7 @@ The URL Shortener includes a beautiful, modern web interface built with HTMX tha
   - Max length: 12 characters
   - Example: `my-custom-link`, `github_profile`
 - **Expiration**: Set time-to-live in seconds (default: 24 hours)
-- **One-Click Results**: 
+- **One-Click Results**:
   - Displays shortened URL with copy button
   - Shows creation time and expiration
   - Auto-saves to recent URLs list
@@ -849,7 +849,7 @@ The URL shortener uses a sophisticated ID generation system:
   - Distributed and conflict-free across multiple instances
   - Time-sortable (IDs increase with time)
   - High-performance (thousands per second)
-  
+
 - **Base62 Encoding**: Converts Snowflake IDs into short, URL-safe strings
   - Character set: `0-9A-Za-z` (62 characters)
 - **Error handling**: Continues operation even if cache fails
@@ -873,8 +873,8 @@ The application includes comprehensive logging throughout the request lifecycle:
 ```
   - Typical length: 11 characters
   - Example: `2005485841350135808` → `2O994sNdbYu`
-  
-- **Benefits**: 
+
+- **Benefits**:
   - No database lookups needed for ID generation
   - Zero collision risk
   - Scalable across multiple servers
@@ -1012,7 +1012,7 @@ docker ps  # Should show url-shortener-postgres container
 
 **Error**: `Failed to connect to database: connection refused`
 
-**Solution**: 
+**Solution**:
 ```bash
 # Check if PostgreSQL container is running
 docker ps | grep postgres

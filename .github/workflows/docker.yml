@@ -11,8 +11,8 @@ jobs:
 
   integration:
     uses: ./.github/workflows/go.yml
-    permissions: 
-      contents: read 
+    permissions:
+      contents: read
       checks: write
 
   build-docker:
