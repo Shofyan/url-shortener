@@ -16,9 +16,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/api
 # Runtime stage
 FROM alpine:3.19
 
-# Pin to specific version to satisfy linting requirements
-RUN apk --no-cache add ca-certificates=20240226-r0
-
 WORKDIR /root/
 
 # Copy binary from builder
