@@ -1,0 +1,407 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  GO_VERSION: '1.21'
+  GOLANGCI_LINT_VERSION: 'v1.57.2'
+
+jobs:
+  # Static Analysis and Linting
+  lint:
+    name: Linting & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+    - name: Cleanup problematic cache
+      run: |
+        # Remove any potentially corrupted cache entries
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/go/pkg/mod || true
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg/mod
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-lint-v2-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/*.go') }}
+        restore-keys: |
+          ${{ runner.os }}-go-lint-v2-${{ hashFiles('**/go.sum') }}-
+          ${{ runner.os }}-go-lint-v2-
+      continue-on-error: true
+
+    - name: Download dependencies
+      run: |
+        # Clean module cache and retry if needed
+        go clean -modcache || true
+
+        # Ensure module directory exists
+        mkdir -p ~/go/pkg/mod
+
+        # Download with retries and verbose output
+        for i in 1 2 3; do
+          if go mod download -x; then
+            break
+          fi
+          echo "Download attempt $i failed, retrying..."
+          sleep 10
+        done
+        go mod verify
+
+    - name: Verify cache state
+      run: |
+        echo "Cache directory structure:"
+        ls -la ~/.cache/ || echo "No cache directory"
+        echo "Go module cache:"
+        ls -la ~/go/pkg/mod/ || echo "No module cache"
+        echo "Disk usage:"
+        du -sh ~/.cache/go-build || true
+        du -sh ~/go/pkg/mod || true
+
+    - name: Clean build artifacts
+      run: |
+        # Clean all Go caches thoroughly
+        go clean -cache -testcache -modcache -fuzzcache || true
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/.cache/golangci-lint || true
+        rm -rf ~/go/pkg/mod || true
+
+        # Ensure clean state
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg/mod
+
+    - name: Debug environment
+      run: |
+        echo "Go version: $(go version)"
+        echo "GOPATH: $GOPATH"
+        echo "GOROOT: $GOROOT"
+        echo "Working directory: $(pwd)"
+        ls -la
+        echo "Go modules status:"
+        go mod verify || true
+
+    - name: Setup environment for linting
+      run: |
+        go env
+        golangci-lint version || echo "golangci-lint not yet installed"
+        ls -la ~/.cache/ || true
+
+    - name: Run golangci-lint (includes revive, gocyclo, gofmt, govet, and more)
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
+        args: --timeout=10m --config=.golangci.yml --verbose --fix=false
+        skip-cache: true
+        skip-pkg-cache: false
+        skip-build-cache: false
+        only-new-issues: false
+      continue-on-error: false
+
+    - name: Verify golangci-lint configuration
+      run: |
+        echo "Enabled linters in .golangci.yml:"
+        echo "- revive (replaces golint with better rules)"
+        echo "- gocyclo (cyclomatic complexity checker, max 10)"
+        echo "- gofmt, govet, gosec, and many more"
+        echo ""
+        echo "Configuration details:"
+        echo "- Revive confidence: 0.8"
+        echo "- Gocyclo max complexity: 10"
+        echo "- Full list in .golangci.yml"
+
+
+ # Security Scanning
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    env:
+      GO_VERSION: '1.21'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      # -----------------------------------------------------------
+      # UPDATED SECTION: Using the official Action
+      # -----------------------------------------------------------
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          # Arguments:
+          # -no-fail: Don't fail the build immediately (let GitHub Security tab handle it)
+          # -fmt sarif: Output format
+          # -out results.sarif: Output filename
+          # ./...: Recursive scan
+          args: -no-fail -fmt sarif -out results.sarif ./...
+
+      # Optional: If you strictly need a text report artifact as well,
+      # you can run it a second time for text output.
+      # (The scan is usually fast enough to run twice).
+      - name: Generate Text Report
+        uses: securego/gosec@master
+        with:
+           args: -no-fail -fmt text -out gosec-report.txt ./...
+
+      - name: Check SARIF file
+        run: |
+          if [ -f "results.sarif" ]; then
+            echo "SARIF file generated successfully"
+            head -n 20 results.sarif
+          else
+            echo "SARIF file not found"
+            exit 1
+          fi
+
+      - name: Upload SARIF file
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+
+      - name: Upload security report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: |
+            results.sarif
+            gosec-report.txt
+          retention-days: 30
+  # Unit and Integration Tests
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: urlshortener_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Cleanup problematic cache
+      run: |
+        # Remove any potentially corrupted cache entries
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/go/pkg/mod || true
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg/mod
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-test-v2-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/*.go') }}
+        restore-keys: |
+          ${{ runner.os }}-go-test-v2-${{ hashFiles('**/go.sum') }}-
+          ${{ runner.os }}-go-test-v2-
+      continue-on-error: true
+
+    - name: Download dependencies
+      run: |
+        # Clean module cache and retry if needed
+        go clean -modcache || true
+
+        # Ensure module directory exists
+        mkdir -p ~/go/pkg/mod
+
+        # Download with retries and verbose output
+        for i in 1 2 3; do
+          if go mod download -x; then
+            break
+          fi
+          echo "Download attempt $i failed, retrying..."
+          sleep 10
+        done
+        go mod verify
+
+    - name: Verify cache state (test job)
+      run: |
+        echo "Cache directory structure:"
+        ls -la ~/.cache/ || echo "No cache directory"
+        echo "Go module cache:"
+        ls -la ~/go/pkg/mod/ || echo "No module cache"
+        echo "Disk usage:"
+        du -sh ~/.cache/go-build || true
+        du -sh ~/go/pkg/mod || true
+
+    - name: Run unit tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+      env:
+        DATABASE_URL: postgres://test:test@localhost:5432/urlshortener_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+
+    - name: Run integration tests
+      run: go test -v -tags=integration ./tests/integration/...
+      env:
+        DATABASE_URL: postgres://test:test@localhost:5432/urlshortener_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+
+    - name: Run concurrency tests
+      run: go test -v -tags=integration -timeout=60s ./tests/concurrency/...
+      env:
+        DATABASE_URL: postgres://test:test@localhost:5432/urlshortener_test?sslmode=disable
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+
+  # Build and Docker
+  build:
+    name: Build & Docker
+    runs-on: ubuntu-latest
+    needs: [lint, security, test]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Build application
+      run: |
+        go build -v -o bin/url-shortener cmd/api/main.go
+        go build -v -o bin/migrate cmd/migrate/main.go
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Extract version
+      id: vars
+      run: |
+        if [[ ${{ github.ref }} == refs/tags/* ]]; then
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener:${{ steps.vars.outputs.VERSION }}
+        labels: |
+          org.opencontainers.image.title=url-shortener
+          org.opencontainers.image.description=High-performance Go URL shortener
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+      continue-on-error: false
+
+
+
+  # Deployment (only on main branch)
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [lint, security, test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to production
+      run: |
+        echo "Deployment would happen here"
+        # Add your deployment steps here
+        # For example, deploy to AWS, GCP, or other cloud providers
+
+    - name: Create release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false

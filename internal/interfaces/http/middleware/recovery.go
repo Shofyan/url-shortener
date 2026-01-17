@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Recovery middleware recovers from panics and returns a 500 error
+// Recovery middleware recovers from panics and returns a 500 error.
 func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {

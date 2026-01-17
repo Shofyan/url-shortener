@@ -1,0 +1,32 @@
+# Hadolint configuration for Dockerfile linting
+# See https://github.com/hadolint/hadolint for more information
+
+# Ignore specific rules
+ignored:
+  - DL3008  # Pin versions in apt get install (may not be needed for all cases)
+  - DL3009  # Delete the apt-get lists after installing something
+  - DL3015  # Avoid additional packages by specifying --no-install-recommends
+
+# Allowed registries (empty means all registries allowed)
+allowed-registries: []
+
+# Override the severity of a rule
+override:
+  error:
+    - DL3002  # Last user should not be root
+    - DL3020  # Use COPY instead of ADD for files and folders
+    - DL3025  # Use arguments JSON notation for CMD and ENTRYPOINT arguments
+  warning:
+    - DL3007  # Using latest is prone to errors
+    - DL3006  # Always tag the version of an image explicitly
+  info: []
+  style: []
+
+# Disable specific rules for inline comments
+inline-ignore-regex: 'hadolint ignore=(\w+)(?:,\s*(\w+))*'
+
+# Set the format of the output
+format: tty
+
+# Enable strict mode (fail on warnings)
+strict-labels: false

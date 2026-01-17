@@ -1,4 +1,4 @@
-.PHONY: help build run test clean docker-up docker-down migrate migrate-create migrate-status
+.PHONY: help build run test clean docker-up docker-down migrate migrate-create migrate-status lint lint-fix lint-install pre-commit
 
 # Load environment variables from .env file if it exists
 ifneq (,$(wildcard .env))
@@ -74,12 +74,67 @@ db-reset: ## Reset database (drop and recreate)
 	@docker exec -it $(POSTGRES_CONTAINER) psql -U $(POSTGRES_USER) -c "CREATE DATABASE $(POSTGRES_DB);"
 	@echo "Database reset complete. Run 'make migrate' to apply migrations."
 
-lint: ## Run linter
-	@echo "Running linter..."
+lint: ## Run golangci-lint with gocyclo and revive enabled
+	@echo "Running golangci-lint..."
 	@golangci-lint run
+
+lint-fix: ## Run golangci-lint with auto-fix
+	@echo "Running golangci-lint with auto-fix..."
+	@golangci-lint run --fix
+lint-install: ## Install golangci-lint and pre-commit tools
+	@echo "Installing linting tools..."
+	@if command -v golangci-lint > /dev/null 2>&1; then \
+		echo "golangci-lint already installed"; \
+	else \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.55.2; \
+	fi
+	@if command -v pre-commit > /dev/null 2>&1; then \
+		echo "pre-commit already installed"; \
+		pre-commit install; \
+	else \
+		echo "❌ pre-commit not found"; \
+		echo "➡ Install it using:"; \
+		echo "   pip install pre-commit"; \
+		echo "   # or"; \
+		echo "   pipx install pre-commit"; \
+		echo "   # or"; \
+		echo "   brew install pre-commit"; \
+		echo "Then run 'make lint-install' again"; \
+	fi
+
+pre-commit: ## Run pre-commit hooks on all files
+	@echo "Running pre-commit hooks..."
+	@pre-commit run --all-files
+
+pre-commit-update: ## Update pre-commit hooks
+	@echo "Updating pre-commit hooks..."
+	@pre-commit autoupdate
+
+quality: ## Run all quality checks (lint + pre-commit)
+	@echo "Running all quality checks..."
+	@$(MAKE) lint
+	@$(MAKE) pre-commit
+
+quality-fix: ## Run all quality fixes (lint-fix + fmt)
+	@echo "Running all quality fixes..."
+	@$(MAKE) lint-fix
+	@$(MAKE) fmt
+
+security-scan: ## Run security scan with gosec
+	@echo "Running security scan..."
+	@gosec ./...
+
+complexity-check: ## Check cyclomatic complexity
+	@echo "Checking cyclomatic complexity..."
+	@gocyclo -over 10 .
 
 fmt: ## Format code
 	@echo "Formatting code..."
 	@go fmt ./...
+	@if command -v goimports > /dev/null 2>&1; then \
+		echo "Running goimports..."; \
+		goimports -w .; \
+	fi
 
 .DEFAULT_GOAL := help

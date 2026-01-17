@@ -43,6 +43,7 @@ services:
       - DATABASE_DBNAME=${POSTGRES_DB:-urlshortener}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - GIN_MODE=release
     depends_on:
       postgres:
         condition: service_healthy
