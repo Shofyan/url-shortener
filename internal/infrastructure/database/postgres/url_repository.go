@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/Shofyan/url-shortener/internal/domain/entity"
@@ -242,6 +243,127 @@ func (r *URLRepository) IncrementVisitCount(ctx context.Context, shortKey *value
 	}
 
 	return nil
+}
+
+// FindExpiredURLs returns URLs that expired before the given timestamp.
+func (r *URLRepository) FindExpiredURLs(ctx context.Context, before time.Time, maxResults int) ([]*entity.URL, error) {
+	query := `
+		SELECT id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at
+		FROM urls
+		WHERE expires_at IS NOT NULL AND expires_at < $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, before, maxResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var urls []*entity.URL
+
+	for rows.Next() {
+		var url entity.URL
+
+		var shortKeyValue, longURLValue string
+
+		err := rows.Scan(
+			&url.ID,
+			&shortKeyValue,
+			&longURLValue,
+			&url.CreatedAt,
+			&url.ExpiresAt,
+			&url.VisitCount,
+			&url.LastAccessedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create value objects
+		shortKey, err := valueobject.NewShortKey(shortKeyValue)
+		if err != nil {
+			return nil, err
+		}
+
+		longURL, err := valueobject.NewLongURL(longURLValue)
+		if err != nil {
+			return nil, err
+		}
+
+		url.ShortKey = shortKey
+		url.LongURL = longURL
+
+		urls = append(urls, &url)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return urls, nil
+}
+
+// DeleteExpiredBatch deletes multiple URLs by their short keys in a single transaction.
+func (r *URLRepository) DeleteExpiredBatch(ctx context.Context, shortKeys []*valueobject.ShortKey) error {
+	if len(shortKeys) == 0 {
+		return nil
+	}
+
+	// Begin transaction for batch delete
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			log.Printf("Warning: Failed to rollback transaction: %v", rollbackErr)
+		}
+	}()
+
+	// Use batch delete with IN clause for better performance
+	query := `DELETE FROM urls WHERE short_key = ANY($1)`
+
+	// Convert short keys to string array
+	keyValues := make([]string, len(shortKeys))
+	for i, key := range shortKeys {
+		keyValues[i] = key.Value()
+	}
+
+	result, err := tx.ExecContext(ctx, query, keyValues)
+	if err != nil {
+		return err
+	}
+
+	// Log the number of deleted records for monitoring
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected != int64(len(shortKeys)) {
+		// Some records might have already been deleted - this is acceptable
+		// in a concurrent environment where multiple cleanup processes might run
+		log.Printf("Deleted %d out of %d requested URLs (some may have been already deleted)", rowsAffected, len(shortKeys))
+	}
+
+	return tx.Commit()
+}
+
+// GetExpiredCount returns the total count of expired URLs for monitoring.
+func (r *URLRepository) GetExpiredCount(ctx context.Context, before time.Time) (int64, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM urls
+		WHERE expires_at IS NOT NULL AND expires_at < $1
+	`
+
+	var count int64
+
+	err := r.db.QueryRowContext(ctx, query, before).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // NewDB creates a new database connection.

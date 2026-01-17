@@ -444,3 +444,22 @@ func (m *MockURLRepository) IncrementVisitCount(ctx context.Context, shortKey *v
 	args := m.Called(ctx, shortKey)
 	return args.Error(0)
 }
+
+func (m *MockURLRepository) FindExpiredURLs(ctx context.Context, before time.Time, maxResults int) ([]*entity.URL, error) {
+	args := m.Called(ctx, before, maxResults)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).([]*entity.URL), args.Error(1)
+}
+
+func (m *MockURLRepository) DeleteExpiredBatch(ctx context.Context, shortKeys []*valueobject.ShortKey) error {
+	args := m.Called(ctx, shortKeys)
+	return args.Error(0)
+}
+
+func (m *MockURLRepository) GetExpiredCount(ctx context.Context, before time.Time) (int64, error) {
+	args := m.Called(ctx, before)
+	return args.Get(0).(int64), args.Error(1)
+}

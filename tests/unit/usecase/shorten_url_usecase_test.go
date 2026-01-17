@@ -11,6 +11,7 @@ import (
 	"github.com/Shofyan/url-shortener/internal/application/dto"
 	"github.com/Shofyan/url-shortener/internal/application/usecase"
 	"github.com/Shofyan/url-shortener/internal/domain/entity"
+	"github.com/Shofyan/url-shortener/internal/domain/repository"
 	"github.com/Shofyan/url-shortener/internal/domain/service"
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
 )
@@ -63,6 +64,25 @@ func (m *MockURLRepository) IncrementVisitCount(ctx context.Context, shortKey *v
 	return args.Error(0)
 }
 
+func (m *MockURLRepository) FindExpiredURLs(ctx context.Context, before time.Time, maxResults int) ([]*entity.URL, error) {
+	args := m.Called(ctx, before, maxResults)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).([]*entity.URL), args.Error(1)
+}
+
+func (m *MockURLRepository) DeleteExpiredBatch(ctx context.Context, shortKeys []*valueobject.ShortKey) error {
+	args := m.Called(ctx, shortKeys)
+	return args.Error(0)
+}
+
+func (m *MockURLRepository) GetExpiredCount(ctx context.Context, before time.Time) (int64, error) {
+	args := m.Called(ctx, before)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 // MockCacheRepository is a mock implementation of CacheRepository.
 type MockCacheRepository struct {
 	mock.Mock
@@ -86,6 +106,25 @@ func (m *MockCacheRepository) Delete(ctx context.Context, key string) error {
 func (m *MockCacheRepository) Exists(ctx context.Context, key string) (bool, error) {
 	args := m.Called(ctx, key)
 	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockCacheRepository) SetCacheEntry(ctx context.Context, key string, entry *repository.CacheEntry, ttl time.Duration) error {
+	args := m.Called(ctx, key, entry, ttl)
+	return args.Error(0)
+}
+
+func (m *MockCacheRepository) GetCacheEntry(ctx context.Context, key string) (*repository.CacheEntry, error) {
+	args := m.Called(ctx, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*repository.CacheEntry), args.Error(1)
+}
+
+func (m *MockCacheRepository) SetTombstone(ctx context.Context, key string, reason string, ttl time.Duration) error {
+	args := m.Called(ctx, key, reason, ttl)
+	return args.Error(0)
 }
 
 // MockGeneratorService is a mock implementation of GeneratorService.
@@ -147,7 +186,7 @@ func TestShortenURL_Success(t *testing.T) {
 	mockIDGen.On("Generate").Return(expectedID, nil)
 	mockShortKeyGen.On("GenerateFromID", expectedID).Return(shortKey, nil)
 	mockURLRepo.On("Save", mock.Anything, mock.AnythingOfType("*entity.URL")).Return(nil)
-	mockCacheRepo.On("Set", mock.Anything, shortKey.Value(), longURL.Value(), mock.AnythingOfType("time.Duration")).Return(nil)
+	mockCacheRepo.On("SetCacheEntry", mock.Anything, shortKey.Value(), mock.AnythingOfType("*repository.CacheEntry"), mock.AnythingOfType("time.Duration")).Return(nil)
 
 	// Execute
 	resp, err := uc.Shorten(context.Background(), req)
@@ -205,7 +244,7 @@ func TestShortenURL_DefaultTTL(t *testing.T) {
 		timeDiff := url.ExpiresAt.Sub(expectedExpiration).Abs()
 		return timeDiff < time.Minute // Allow 1 minute tolerance
 	})).Return(nil)
-	mockCacheRepo.On("Set", mock.Anything, shortKey.Value(), longURL.Value(), mock.AnythingOfType("time.Duration")).Return(nil)
+	mockCacheRepo.On("SetCacheEntry", mock.Anything, shortKey.Value(), mock.AnythingOfType("*repository.CacheEntry"), mock.AnythingOfType("time.Duration")).Return(nil)
 
 	// Execute
 	resp, err := uc.Shorten(context.Background(), req)
@@ -253,10 +292,10 @@ func TestGetLongURL_Success(t *testing.T) {
 	url.ExpiresAt = &expiresAt
 
 	// Mock expectations - cache miss, then database hit
-	mockCacheRepo.On("Get", mock.Anything, "abc123").Return("", assert.AnError)
+	mockCacheRepo.On("GetCacheEntry", mock.Anything, "abc123").Return(nil, assert.AnError)
 	mockURLRepo.On("FindByShortKey", mock.Anything, shortKey).Return(url, nil)
 	mockURLRepo.On("IncrementVisitCount", mock.Anything, shortKey).Return(nil)
-	mockCacheRepo.On("Set", mock.Anything, "abc123", "https://example.com", mock.AnythingOfType("time.Duration")).Return(nil)
+	mockCacheRepo.On("SetCacheEntry", mock.Anything, "abc123", mock.AnythingOfType("*repository.CacheEntry"), mock.AnythingOfType("time.Duration")).Return(nil)
 
 	// Execute
 	redirectURL, err := uc.GetLongURL(context.Background(), "abc123")

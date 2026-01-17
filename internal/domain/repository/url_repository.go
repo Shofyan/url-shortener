@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/Shofyan/url-shortener/internal/domain/entity"
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
@@ -29,4 +30,14 @@ type URLRepository interface {
 
 	// IncrementVisitCount atomically increments visit count and updates last_accessed_at
 	IncrementVisitCount(ctx context.Context, shortKey *valueobject.ShortKey) error
+
+	// FindExpiredURLs returns URLs that expired before the given timestamp
+	// Limited to maxResults for batch processing
+	FindExpiredURLs(ctx context.Context, before time.Time, maxResults int) ([]*entity.URL, error)
+
+	// DeleteExpiredBatch deletes multiple URLs by their short keys in a single transaction
+	DeleteExpiredBatch(ctx context.Context, shortKeys []*valueobject.ShortKey) error
+
+	// GetExpiredCount returns the total count of expired URLs for monitoring
+	GetExpiredCount(ctx context.Context, before time.Time) (int64, error)
 }

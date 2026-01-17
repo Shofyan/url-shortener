@@ -200,61 +200,137 @@ func (uc *ShortenURLUseCase) createAndConfigureURL(shortKey *valueobject.ShortKe
 	return url
 }
 
-// cacheURL caches the URL mapping.
+// cacheURL caches the URL mapping using structured cache entries.
 func (uc *ShortenURLUseCase) cacheURL(ctx context.Context, shortKey *valueobject.ShortKey, longURL *valueobject.LongURL, expiresAt *time.Time) {
+	cacheEntry := &repository.CacheEntry{
+		LongURL:   longURL.Value(),
+		ExpiresAt: expiresAt,
+		CreatedAt: time.Now(),
+	}
+
 	cacheTTL := uc.defaultTTL
 	if expiresAt != nil {
 		cacheTTL = time.Until(*expiresAt)
+		// Ensure positive TTL
+		if cacheTTL <= 0 {
+			cacheTTL = time.Minute // Minimum cache time
+		}
 	}
 
-	log.Printf("[Shorten] Caching URL mapping with TTL: %v", cacheTTL)
+	log.Printf("[Shorten] Caching structured URL entry with TTL: %v", cacheTTL)
 
-	if err := uc.cacheRepo.Set(ctx, shortKey.Value(), longURL.Value(), cacheTTL); err != nil {
-		log.Printf("[Shorten] Warning: Failed to cache URL mapping: %v", err)
+	if err := uc.cacheRepo.SetCacheEntry(ctx, shortKey.Value(), cacheEntry, cacheTTL); err != nil {
+		log.Printf("[Shorten] Warning: Failed to cache structured URL entry: %v", err)
+
+		// Fallback to simple caching for compatibility
+		if err := uc.cacheRepo.Set(ctx, shortKey.Value(), longURL.Value(), cacheTTL); err != nil {
+			log.Printf("[Shorten] Warning: Fallback cache also failed: %v", err)
+		}
 	} else {
-		log.Printf("[Shorten] URL cached successfully")
+		log.Printf("[Shorten] Structured URL cached successfully")
 	}
 }
 
-// GetLongURL retrieves the long URL from a short key.
+// GetLongURL retrieves the long URL from a short key using hybrid expiration strategy.
+// This implements the "Lazy Validation" pattern - expiration is checked logically
+// without performing synchronous deletes on the read path.
 func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string) (string, error) {
 	shortKey, err := valueobject.NewShortKey(shortKeyStr)
 	if err != nil {
 		return "", err
 	}
 
-	var longURL string
-
-	// Try cache first
-	if cachedURL, err := uc.cacheRepo.Get(ctx, shortKey.Value()); err == nil && cachedURL != "" {
-		longURL = cachedURL
-	} else {
-		// Fetch from database
-		url, err := uc.urlRepo.FindByShortKey(ctx, shortKey)
-		if err != nil {
-			return "", ErrURLNotFound
-		}
-
-		// Check expiration
-		if url.IsExpired() {
-			_ = uc.urlRepo.Delete(ctx, shortKey)
-			_ = uc.cacheRepo.Delete(ctx, shortKey.Value())
-
-			return "", ErrURLExpired
-		}
-
-		longURL = url.LongURL.Value()
-
-		// Update cache
-		cacheTTL := uc.defaultTTL
-		if url.ExpiresAt != nil {
-			cacheTTL = time.Until(*url.ExpiresAt)
-		}
-
-		_ = uc.cacheRepo.Set(ctx, shortKey.Value(), longURL, cacheTTL)
+	// Phase 1: Try structured cache lookup first
+	if longURL, err := uc.tryGetFromCache(ctx, shortKey); err != nil {
+		return "", err
+	} else if longURL != "" {
+		return longURL, nil
 	}
 
-	// Always increment visit count regardless of cache hit/miss
+	// Phase 2-4: Cache miss - handle database lookup and caching
+	return uc.handleCacheMiss(ctx, shortKey)
+}
+
+// tryGetFromCache attempts to retrieve URL from cache, returns empty string if cache miss.
+func (uc *ShortenURLUseCase) tryGetFromCache(ctx context.Context, shortKey *valueobject.ShortKey) (string, error) {
+	cacheEntry, err := uc.cacheRepo.GetCacheEntry(ctx, shortKey.Value())
+	if err != nil || cacheEntry == nil {
+		return "", nil // Cache miss, not an error
+	}
+
+	// Handle tombstone - return appropriate error immediately
+	if cacheEntry.IsTombstone {
+		switch cacheEntry.Reason {
+		case "expired":
+			return "", ErrURLExpired
+		case "deleted":
+			return "", ErrURLNotFound
+		default:
+			return "", ErrURLNotFound
+		}
+	}
+
+	// Validate expiration even for cached entries (defense against clock skew)
+	if cacheEntry.IsExpired() {
+		// Cache tombstone to prevent thundering herd on hot expired URLs
+		_ = uc.cacheRepo.SetTombstone(ctx, shortKey.Value(), "expired", time.Hour)
+		return "", ErrURLExpired
+	}
+
+	// Cache hit - increment visit count and return
+	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
+		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+	}
+
+	return cacheEntry.LongURL, nil
+}
+
+// handleCacheMiss handles database lookup, validation, and caching for cache misses.
+func (uc *ShortenURLUseCase) handleCacheMiss(ctx context.Context, shortKey *valueobject.ShortKey) (string, error) {
+	// Phase 2: Cache miss - fetch from database
+	url, err := uc.urlRepo.FindByShortKey(ctx, shortKey)
+	if err != nil {
+		// Cache negative result to prevent repeated DB lookups
+		_ = uc.cacheRepo.SetTombstone(ctx, shortKey.Value(), "deleted", time.Hour)
+		return "", ErrURLNotFound
+	}
+
+	// Phase 3: CRITICAL - Lazy Validation (no synchronous deletes!)
+	if url.IsExpired() {
+		// Cache tombstone to protect DB from thundering herd
+		_ = uc.cacheRepo.SetTombstone(ctx, shortKey.Value(), "expired", time.Hour)
+		// DO NOT DELETE FROM DATABASE HERE - let background cleanup handle it
+		return "", ErrURLExpired
+	}
+
+	// Phase 4: Valid URL - populate cache and return
+	return uc.cacheValidURL(ctx, shortKey, url)
+}
+
+// cacheValidURL caches a valid URL and returns its long URL value.
+func (uc *ShortenURLUseCase) cacheValidURL(ctx context.Context, shortKey *valueobject.ShortKey, url *entity.URL) (string, error) {
+	longURL := url.LongURL.Value()
+
+	// Store structured cache entry with expiration metadata
+	cacheEntry := &repository.CacheEntry{
+		LongURL:   longURL,
+		ExpiresAt: url.ExpiresAt,
+		CreatedAt: time.Now(),
+	}
+
+	// Calculate cache TTL
+	cacheTTL := uc.defaultTTL
+	if url.ExpiresAt != nil {
+		cacheTTL = time.Until(*url.ExpiresAt)
+		// Ensure positive TTL
+		if cacheTTL <= 0 {
+			cacheTTL = time.Minute // Minimum cache time
+		}
+	}
+
+	_ = uc.cacheRepo.SetCacheEntry(ctx, shortKey.Value(), cacheEntry, cacheTTL)
+
+	// Increment visit count (fire-and-forget)
 	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
 		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
 	}

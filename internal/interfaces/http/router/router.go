@@ -50,6 +50,10 @@ func SetupRouter(cfg *config.Config, urlHandler *handler.URLHandler, webHandler 
 	// Stats endpoint (GET /stats/{short_code})
 	router.GET("/stats/:shortKey", urlHandler.GetStats)
 
+	// Admin routes (no rate limiting for internal monitoring)
+	admin := router.Group("/api/admin")
+	admin.GET("/cleanup/stats", urlHandler.GetCleanupStats)
+
 	// Web UI routes (serve after API routes to avoid conflicts)
 	router.GET("/web", webHandler.Index)
 	router.GET("/web/*filepath", webHandler.Index)

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/Shofyan/url-shortener/internal/domain/service"
 )
 
 // Config holds all application configuration.
@@ -55,6 +57,12 @@ type AppConfig struct {
 	RateLimitRequests int
 	RateLimitWindow   time.Duration
 	GinMode           string
+	// Cleanup configuration for expired URLs
+	CleanupEnabled     bool
+	CleanupInterval    time.Duration
+	CleanupBatchSize   int
+	CleanupBufferTime  time.Duration
+	CleanupMaxDuration time.Duration
 }
 
 // Load loads configuration from file and environment variables.
@@ -118,6 +126,13 @@ func setDefaults() {
 	viper.SetDefault("app.ratelimitrequests", 100)
 	viper.SetDefault("app.ratelimitwindow", "1m")
 	viper.SetDefault("app.ginmode", "release")
+
+	// Cleanup defaults
+	viper.SetDefault("app.cleanupenabled", true)
+	viper.SetDefault("app.cleanupinterval", "15m")
+	viper.SetDefault("app.cleanupbatchsize", 1000)
+	viper.SetDefault("app.cleanupbuffertime", "1h")
+	viper.SetDefault("app.cleanupmaxduration", "5m")
 }
 
 // GetDSN returns the PostgreSQL connection string.
@@ -129,4 +144,15 @@ func (c *DatabaseConfig) GetDSN() string {
 // GetRedisAddr returns the Redis address.
 func (c *RedisConfig) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%s", c.Host, c.Port)
+}
+
+// GetCleanupConfig creates a cleanup service configuration from app config.
+func (c *AppConfig) GetCleanupConfig() *service.CleanupConfig {
+	return &service.CleanupConfig{
+		Enabled:            c.CleanupEnabled,
+		CleanupInterval:    c.CleanupInterval,
+		BatchSize:          c.CleanupBatchSize,
+		BufferTime:         c.CleanupBufferTime,
+		MaxCleanupDuration: c.CleanupMaxDuration,
+	}
 }

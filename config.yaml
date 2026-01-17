@@ -30,3 +30,9 @@ app:
   ratelimitrequests: 100
   ratelimitwindow: "1m"
   ginmode: "release"
+  # URL cleanup configuration for hybrid expiration strategy
+  cleanupenabled: true
+  cleanupinterval: "15m"      # Run cleanup every 15 minutes
+  cleanupbatchsize: 1000      # Process up to 1000 expired URLs per batch
+  cleanupbuffertime: "1h"     # Only delete URLs that expired more than 1 hour ago (clock skew protection)
+  cleanupmaxduration: "5m"    # Maximum time allowed for a single cleanup operation

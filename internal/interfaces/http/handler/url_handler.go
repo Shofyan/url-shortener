@@ -7,17 +7,20 @@ import (
 
 	"github.com/Shofyan/url-shortener/internal/application/dto"
 	"github.com/Shofyan/url-shortener/internal/application/usecase"
+	"github.com/Shofyan/url-shortener/internal/domain/service"
 )
 
 // URLHandler handles URL shortening HTTP requests.
 type URLHandler struct {
-	useCase *usecase.ShortenURLUseCase
+	useCase        *usecase.ShortenURLUseCase
+	cleanupService service.URLCleanupService
 }
 
 // NewURLHandler creates a new URLHandler.
-func NewURLHandler(useCase *usecase.ShortenURLUseCase) *URLHandler {
+func NewURLHandler(useCase *usecase.ShortenURLUseCase, cleanupService service.URLCleanupService) *URLHandler {
 	return &URLHandler{
-		useCase: useCase,
+		useCase:        useCase,
+		cleanupService: cleanupService,
 	}
 }
 
@@ -117,4 +120,19 @@ func (h *URLHandler) HealthCheck(c *gin.Context) {
 		"status":  "healthy",
 		"service": "url-shortener",
 	})
+}
+
+// GetCleanupStats handles GET /api/admin/cleanup/stats requests.
+func (h *URLHandler) GetCleanupStats(c *gin.Context) {
+	if h.cleanupService == nil {
+		c.JSON(http.StatusServiceUnavailable, dto.ErrorResponse{
+			Error:   "service_unavailable",
+			Message: "Cleanup service is not available",
+		})
+
+		return
+	}
+
+	stats := h.cleanupService.GetCleanupStats()
+	c.JSON(http.StatusOK, stats)
 }

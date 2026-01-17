@@ -2,10 +2,13 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+
+	"github.com/Shofyan/url-shortener/internal/domain/repository"
 )
 
 var (
@@ -57,6 +60,52 @@ func (r *CacheRepository) Exists(ctx context.Context, key string) (bool, error) 
 	}
 
 	return count > 0, nil
+}
+
+// SetCacheEntry stores a structured cache entry with metadata.
+func (r *CacheRepository) SetCacheEntry(ctx context.Context, key string, entry *repository.CacheEntry, ttl time.Duration) error {
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+
+	return r.client.Set(ctx, key, data, ttl).Err()
+}
+
+// GetCacheEntry retrieves a structured cache entry.
+func (r *CacheRepository) GetCacheEntry(ctx context.Context, key string) (*repository.CacheEntry, error) {
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, ErrCacheMiss
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	var entry repository.CacheEntry
+	if err := json.Unmarshal([]byte(val), &entry); err != nil {
+		// If JSON parsing fails, it might be a legacy simple string cache entry
+		// Fall back to creating a simple cache entry
+		return &repository.CacheEntry{
+			LongURL:     val,
+			CreatedAt:   time.Now(),
+			IsTombstone: false,
+		}, nil
+	}
+
+	return &entry, nil
+}
+
+// SetTombstone stores a tombstone marker for an expired/deleted URL.
+func (r *CacheRepository) SetTombstone(ctx context.Context, key, reason string, ttl time.Duration) error {
+	tombstone := &repository.CacheEntry{
+		IsTombstone: true,
+		Reason:      reason,
+		CreatedAt:   time.Now(),
+	}
+
+	return r.SetCacheEntry(ctx, key, tombstone, ttl)
 }
 
 // NewRedisClient creates a new Redis client.
