@@ -54,6 +54,7 @@ type AppConfig struct {
 	SnowflakeNodeID   int64
 	RateLimitRequests int
 	RateLimitWindow   time.Duration
+	GinMode           string
 }
 
 // Load loads configuration from file and environment variables.
@@ -116,6 +117,7 @@ func setDefaults() {
 	viper.SetDefault("app.snowflakenodeid", 1)
 	viper.SetDefault("app.ratelimitrequests", 100)
 	viper.SetDefault("app.ratelimitwindow", "1m")
+	viper.SetDefault("app.ginmode", "release")
 }
 
 // GetDSN returns the PostgreSQL connection string.

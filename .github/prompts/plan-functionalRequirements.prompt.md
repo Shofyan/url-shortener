@@ -1,4 +1,5 @@
 # Technical Requirements Document
+
 ## Distributed URL Shortener - Functional Requirements Implementation
 
 ### Executive Summary
@@ -20,9 +21,9 @@ The current Go URL shortener implementation demonstrates solid architectural pat
 
 | Component | File | Current | Required | Priority |
 |-----------|------|---------|----------|----------|
-| URL Creation | [interfaces/http/router/router.go](interfaces/http/router/router.go) | `POST /api/shorten` | `POST /` | CRITICAL |
-| Redirection | [interfaces/http/router/router.go](interfaces/http/router/router.go) | `GET /:shortKey` | `GET /s/:shortKey` | CRITICAL |
-| Processing Header | [interfaces/http/middleware/](interfaces/http/middleware/) | Not implemented | Add timing middleware | CRITICAL |
+| URL Creation | [interfaces/http/router/router.go] | `POST /api/shorten` | `POST /` | CRITICAL |
+| Redirection | [interfaces/http/router/router.go] | `GET /:shortKey` | `GET /s/:shortKey` | CRITICAL |
+| Processing Header | [interfaces/http/middleware/] | Not implemented | Add timing middleware | CRITICAL |
 
 ### 1.2 Request Parameter Compliance
 
@@ -30,7 +31,7 @@ The current Go URL shortener implementation demonstrates solid architectural pat
 - Uses `expires_in` instead of required `ttl_seconds`
 - No default 24-hour TTL implementation
 
-**Required Changes in [application/dto/url_dto.go](application/dto/url_dto.go):**
+**Required Changes in [application/dto/url_dto.go]:**
 ```go
 type ShortenURLRequest struct {
     LongURL    string `json:"long_url" binding:"required"`
@@ -64,7 +65,7 @@ ALTER TABLE url_analytics ALTER COLUMN short_key TYPE VARCHAR(12);
 
 ### 2.2 Entity Model Updates
 
-**Required Changes in [domain/entity/url.go](domain/entity/url.go):**
+**Required Changes in [domain/entity/url.go]:**
 ```go
 type URL struct {
     ID             int64
@@ -85,7 +86,7 @@ type URL struct {
 
 **Current Issue:** Base62 generator includes prohibited characters `0`, `O`, `l`, `1`
 
-**Required Fix in [infrastructure/generator/base62/generator.go](infrastructure/generator/base62/generator.go):**
+**Required Fix in [infrastructure/generator/base62/generator.go]:**
 ```go
 // Replace current character set
 const base62Chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"
@@ -96,7 +97,7 @@ const base62Chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"
 
 **Current Issue:** No default TTL when `ttl_seconds` not provided
 
-**Required Changes in [application/usecase/shorten_url_usecase.go](application/usecase/shorten_url_usecase.go):**
+**Required Changes in [application/usecase/shorten_url_usecase.go]:**
 ```go
 const defaultTTLSeconds = 24 * 60 * 60 // 24 hours
 
@@ -134,7 +135,7 @@ func (r *PostgresURLRepository) IncrementVisitCount(ctx context.Context, shortKe
 
 ### 4.1 Processing Time Header Implementation
 
-**Required New File: [interfaces/http/middleware/timing.go](interfaces/http/middleware/timing.go)**
+**Required New File: [interfaces/http/middleware/timing.go]**
 ```go
 package middleware
 
@@ -158,7 +159,7 @@ func ProcessingTime() gin.HandlerFunc {
 
 **Critical Issue:** IP address logging violates PII requirements
 
-**Required Fix in [interfaces/http/middleware/logger.go](interfaces/http/middleware/logger.go):**
+**Required Fix in [interfaces/http/middleware/logger.go]:**
 ```go
 // REMOVE IP address from logs
 log.Printf("[%s] %s %s | Status: %d | Latency: %v",
@@ -174,7 +175,7 @@ log.Printf("[%s] %s %s | Status: %d | Latency: %v",
 
 **Current Missing Field:** `last_accessed_at` in stats response
 
-**Required Changes in [application/dto/url_dto.go](application/dto/url_dto.go):**
+**Required Changes in [application/dto/url_dto.go]:**
 ```go
 type URLStatsResponse struct {
     ShortKey       string `json:"short_key"`
@@ -193,22 +194,22 @@ type URLStatsResponse struct {
 ### Phase 1: Critical Security & Compliance (1-2 days)
 | Task | File(s) | Risk Level | Effort |
 |------|---------|------------|---------|
-| Remove IP logging | [interfaces/http/middleware/logger.go](interfaces/http/middleware/logger.go) | CRITICAL | 2 hours |
-| Fix API routes | [interfaces/http/router/router.go](interfaces/http/router/router.go) | HIGH | 4 hours |
-| Add processing time header | [interfaces/http/middleware/timing.go](interfaces/http/middleware/timing.go) | MEDIUM | 4 hours |
+| Remove IP logging | [interfaces/http/middleware/logger.go] | CRITICAL | 2 hours |
+| Fix API routes | [interfaces/http/router/router.go] | HIGH | 4 hours |
+| Add processing time header | [interfaces/http/middleware/timing.go]| MEDIUM | 4 hours |
 
 ### Phase 2: Data Integrity & Schema (2-3 days)
 | Task | File(s) | Risk Level | Effort |
 |------|---------|------------|---------|
 | Database migration | New migration file | HIGH | 6 hours |
-| Update entity model | [domain/entity/url.go](domain/entity/url.go) | HIGH | 4 hours |
-| Repository updates | [infrastructure/database/postgres/url_repository.go](infrastructure/database/postgres/url_repository.go) | HIGH | 8 hours |
+| Update entity model | [domain/entity/url.go]| HIGH | 4 hours |
+| Repository updates | [infrastructure/database/postgres/url_repository.go] | HIGH | 8 hours |
 
 ### Phase 3: Business Logic Fixes (3-4 days)
 | Task | File(s) | Risk Level | Effort |
 |------|---------|------------|---------|
-| Character exclusion | [infrastructure/generator/base62/generator.go](infrastructure/generator/base62/generator.go) | MEDIUM | 3 hours |
-| Default TTL | [application/usecase/shorten_url_usecase.go](application/usecase/shorten_url_usecase.go) | MEDIUM | 4 hours |
+| Character exclusion | [infrastructure/generator/base62/generator.go]| MEDIUM | 3 hours |
+| Default TTL | [application/usecase/shorten_url_usecase.go]| MEDIUM | 4 hours |
 | Thread-safe counting | Multiple repository files | HIGH | 8 hours |
 
 ### Phase 4: Testing & Documentation (1-2 weeks)

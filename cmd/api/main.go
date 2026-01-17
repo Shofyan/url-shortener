@@ -99,7 +99,7 @@ func main() {
 	rateLimiter := middleware.NewRateLimiter(cfg.App.RateLimitRequests, cfg.App.RateLimitRequests)
 
 	// Setup router
-	r := router.SetupRouter(urlHandler, webHandler, rateLimiter)
+	r := router.SetupRouter(cfg, urlHandler, webHandler, rateLimiter)
 
 	// Create HTTP server
 	srv := &http.Server{

@@ -29,3 +29,4 @@ app:
   snowflakenodeid: 1
   ratelimitrequests: 100
   ratelimitwindow: "1m"
+  ginmode: "release"
