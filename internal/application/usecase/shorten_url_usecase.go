@@ -136,7 +136,7 @@ func (uc *ShortenURLUseCase) Shorten(ctx context.Context, req *dto.ShortenURLReq
 		ttl = defaultTTLSeconds
 		log.Printf("[Shorten] No TTL specified, using default: %d seconds (24 hours)", defaultTTLSeconds)
 	}
-	
+
 	log.Printf("[Shorten] Setting expiration: %d seconds", ttl)
 	url.SetExpiration(time.Duration(ttl) * time.Second)
 	log.Printf("[Shorten] Expiration set to: %v", url.ExpiresAt)
