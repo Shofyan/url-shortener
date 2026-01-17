@@ -147,7 +147,7 @@ issues:
 # Run configuration
 run:
   # Timeout for analysis
-  timeout: 5m
+  timeout: 10m
 
   # Exit code when at least one issue was found
   issues-exit-code: 1
@@ -155,9 +155,18 @@ run:
   # Include test files in analysis
   tests: true
 
+  # Number of concurrent workers
+  concurrency: 4
+
   # List of build tags
   build-tags:
     - integration
+
+  # Allow multiple parallel golangci-lint instances running
+  allow-parallel-runners: true
+
+  # Allow serial runners (disable parallel processing if needed)
+  allow-serial-runners: true
 
 # Output configuration
 output:

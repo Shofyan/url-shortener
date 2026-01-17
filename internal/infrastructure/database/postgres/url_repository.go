@@ -221,6 +221,8 @@ func (r *URLRepository) ExistsByShortKey(ctx context.Context, shortKey *valueobj
 
 // IncrementVisitCount atomically increments visit count and updates last_accessed_at.
 func (r *URLRepository) IncrementVisitCount(ctx context.Context, shortKey *valueobject.ShortKey) error {
+	log.Printf("[IncrementVisitCount] Incrementing visit count for short key: %s", shortKey.Value())
+
 	query := `
 		UPDATE urls
 		SET visit_count = visit_count + 1,
@@ -230,6 +232,7 @@ func (r *URLRepository) IncrementVisitCount(ctx context.Context, shortKey *value
 
 	result, err := r.db.ExecContext(ctx, query, shortKey.Value())
 	if err != nil {
+		log.Printf("[IncrementVisitCount] Error incrementing visit count for %s: %v", shortKey.Value(), err)
 		return err
 	}
 

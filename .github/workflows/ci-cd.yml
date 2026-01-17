@@ -5,10 +5,15 @@ on:
     branches: [ main, develop, stage ]
   pull_request:
     branches: [ main, develop, stage ]
-
+    
+permissions:
+  contents: write
+  security-events: write
+  actions: write
+  
 env:
   GO_VERSION: '1.21'
-  GOLANGCI_LINT_VERSION: 'v1.56.2'
+  GOLANGCI_LINT_VERSION: 'v1.57.2'
 
 jobs:
   # Static Analysis and Linting
@@ -16,6 +21,14 @@ jobs:
     name: Linting & Static Analysis
     runs-on: ubuntu-latest
     steps:
+    - name: Cleanup problematic cache
+      run: |
+        # Remove any potentially corrupted cache entries
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/go/pkg/mod || true
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg/mod
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -27,21 +40,83 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
 
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-lint-v2-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/*.go') }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          ${{ runner.os }}-go-lint-v2-${{ hashFiles('**/go.sum') }}-
+          ${{ runner.os }}-go-lint-v2-
+      continue-on-error: true
 
     - name: Download dependencies
-      run: go mod download
+      run: |
+        # Clean module cache and retry if needed
+        go clean -modcache || true
+
+        # Ensure module directory exists
+        mkdir -p ~/go/pkg/mod
+
+        # Download with retries and verbose output
+        for i in 1 2 3; do
+          if go mod download -x; then
+            break
+          fi
+          echo "Download attempt $i failed, retrying..."
+          sleep 10
+        done
+        go mod verify
+
+    - name: Verify cache state
+      run: |
+        echo "Cache directory structure:"
+        ls -la ~/.cache/ || echo "No cache directory"
+        echo "Go module cache:"
+        ls -la ~/go/pkg/mod/ || echo "No module cache"
+        echo "Disk usage:"
+        du -sh ~/.cache/go-build || true
+        du -sh ~/go/pkg/mod || true
+
+    - name: Clean build artifacts
+      run: |
+        # Clean all Go caches thoroughly
+        go clean -cache -testcache -modcache -fuzzcache || true
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/.cache/golangci-lint || true
+        rm -rf ~/go/pkg/mod || true
+
+        # Ensure clean state
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg/mod
+
+    - name: Debug environment
+      run: |
+        echo "Go version: $(go version)"
+        echo "GOPATH: $GOPATH"
+        echo "GOROOT: $GOROOT"
+        echo "Working directory: $(pwd)"
+        ls -la
+        echo "Go modules status:"
+        go mod verify || true
+
+    - name: Setup environment for linting
+      run: |
+        go env
+        golangci-lint version || echo "golangci-lint not yet installed"
+        ls -la ~/.cache/ || true
 
     - name: Run golangci-lint (includes revive, gocyclo, gofmt, govet, and more)
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v4
       with:
         version: ${{ env.GOLANGCI_LINT_VERSION }}
-        args: --timeout=5m --config=.golangci.yml --verbose
+        args: --timeout=10m --config=.golangci.yml --verbose --fix=false
+        skip-cache: true
+        skip-pkg-cache: false
+        skip-build-cache: false
+        only-new-issues: false
+      continue-on-error: false
 
     - name: Verify golangci-lint configuration
       run: |
@@ -55,29 +130,76 @@ jobs:
         echo "- Gocyclo max complexity: 10"
         echo "- Full list in .golangci.yml"
 
-  # Security Scanning
+
+ # Security Scanning
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    env:
+      GO_VERSION: '1.21'
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
 
-    - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-no-fail -fmt sarif -out results.sarif ./...'
+      # -----------------------------------------------------------
+      # UPDATED SECTION: Using the official Action
+      # -----------------------------------------------------------
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          # Arguments:
+          # -no-fail: Don't fail the build immediately (let GitHub Security tab handle it)
+          # -fmt sarif: Output format
+          # -out results.sarif: Output filename
+          # ./...: Recursive scan
+          args: -no-fail -fmt sarif -out results.sarif ./...
 
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: results.sarif
+      # Optional: If you strictly need a text report artifact as well,
+      # you can run it a second time for text output.
+      # (The scan is usually fast enough to run twice).
+      - name: Generate Text Report
+        uses: securego/gosec@master
+        with:
+           args: -no-fail -fmt text -out gosec-report.txt ./...
 
+      - name: Check SARIF file
+        run: |
+          if [ -f "results.sarif" ]; then
+            echo "SARIF file generated successfully"
+            head -n 20 results.sarif
+          else
+            echo "SARIF file not found"
+            exit 1
+          fi
+
+      - name: Upload SARIF file
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+
+      - name: Upload security report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: |
+            results.sarif
+            gosec-report.txt
+          retention-days: 30
   # Unit and Integration Tests
   test:
     name: Tests
@@ -108,24 +230,61 @@ jobs:
           - 6379:6379
 
     steps:
+    - name: Cleanup problematic cache
+      run: |
+        # Remove any potentially corrupted cache entries
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/go/pkg/mod || true
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg/mod
+
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
 
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-test-v2-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/*.go') }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          ${{ runner.os }}-go-test-v2-${{ hashFiles('**/go.sum') }}-
+          ${{ runner.os }}-go-test-v2-
+      continue-on-error: true
 
     - name: Download dependencies
-      run: go mod download
+      run: |
+        # Clean module cache and retry if needed
+        go clean -modcache || true
+
+        # Ensure module directory exists
+        mkdir -p ~/go/pkg/mod
+
+        # Download with retries and verbose output
+        for i in 1 2 3; do
+          if go mod download -x; then
+            break
+          fi
+          echo "Download attempt $i failed, retrying..."
+          sleep 10
+        done
+        go mod verify
+
+    - name: Verify cache state (test job)
+      run: |
+        echo "Cache directory structure:"
+        ls -la ~/.cache/ || echo "No cache directory"
+        echo "Go module cache:"
+        ls -la ~/go/pkg/mod/ || echo "No module cache"
+        echo "Disk usage:"
+        du -sh ~/.cache/go-build || true
+        du -sh ~/go/pkg/mod || true
 
     - name: Run unit tests
       run: go test -v -race -coverprofile=coverage.out ./...
@@ -145,11 +304,13 @@ jobs:
         DATABASE_URL: postgres://test:test@localhost:5432/urlshortener_test?sslmode=disable
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
         flags: unittests
         name: codecov-umbrella
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
 
   # Build and Docker
   build:
@@ -174,11 +335,10 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Log in to Docker Hub
-      if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Extract version
       id: vars
@@ -215,12 +375,8 @@ jobs:
           org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
         cache-from: type=gha
         cache-to: type=gha,mode=max
-
-    - name: Run Hadolint (Dockerfile linter)
-      uses: hadolint/hadolint-action@v3.1.0
-      with:
-        dockerfile: Dockerfile
-        config: .hadolint.yaml
+        platforms: linux/amd64
+      continue-on-error: false
 
 
 

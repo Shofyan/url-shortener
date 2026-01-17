@@ -1,0 +1,28 @@
+# Example terraform.tfvars file
+# Copy this file to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Configuration
+project_name = "url-shortener"
+environment  = "production"
+
+# EC2 Configuration
+instance_type   = "t2.micro"
+key_pair_name   = "your-key-pair-name"  # Replace with your AWS key pair name
+app_port        = 8080
+
+# Database Configuration
+db_username = "postgres"
+db_password = "your-secure-database-password"  # Use a strong password
+
+# Redis Configuration (optional)
+redis_auth_token = ""  # Leave empty for no authentication
+
+# Security Configuration
+allowed_cidr_blocks = ["0.0.0.0/0"]  # WARNING: This allows access from anywhere.
+                                      # For production, restrict to your IP ranges
+
+# Domain Configuration (optional)
+domain_name = ""  # If you have a domain name, enter it here
