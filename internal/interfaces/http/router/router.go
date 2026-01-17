@@ -53,6 +53,7 @@ func SetupRouter(cfg *config.Config, urlHandler *handler.URLHandler, webHandler 
 	// Admin routes (no rate limiting for internal monitoring)
 	admin := router.Group("/api/admin")
 	admin.GET("/cleanup/stats", urlHandler.GetCleanupStats)
+	admin.POST("/cleanup/manual", urlHandler.TriggerManualCleanup)
 
 	// Web UI routes (serve after API routes to avoid conflicts)
 	router.GET("/web", webHandler.Index)

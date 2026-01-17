@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -135,4 +136,54 @@ func (h *URLHandler) GetCleanupStats(c *gin.Context) {
 
 	stats := h.cleanupService.GetCleanupStats()
 	c.JSON(http.StatusOK, stats)
+}
+
+// TriggerManualCleanup handles POST /api/admin/cleanup/manual requests.
+func (h *URLHandler) TriggerManualCleanup(c *gin.Context) {
+	if h.cleanupService == nil {
+		c.JSON(http.StatusServiceUnavailable, dto.ErrorResponse{
+			Error:   "service_unavailable",
+			Message: "Cleanup service is not available",
+		})
+
+		return
+	}
+
+	var req struct {
+		BatchSize int `json:"batch_size"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+
+		return
+	}
+
+	// Set default batch size if not provided or invalid
+	if req.BatchSize <= 0 || req.BatchSize > 10000 {
+		req.BatchSize = 1000
+	}
+
+	start := time.Now()
+	cleanedCount, err := h.cleanupService.CleanupExpiredBatch(c.Request.Context(), req.BatchSize)
+	duration := time.Since(start)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "cleanup_failed",
+			Message: err.Error(),
+		})
+
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"cleaned_count": cleanedCount,
+		"batch_size":    req.BatchSize,
+		"duration_ms":   float64(duration.Nanoseconds()) / 1000000,
+		"timestamp":     time.Now().UTC(),
+	})
 }

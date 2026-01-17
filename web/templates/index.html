@@ -30,6 +30,10 @@
                     <span class="tab-icon">📊</span>
                     Get Statistics
                 </button>
+                <button class="tab-btn" onclick="switchTab('clean')">
+                    <span class="tab-icon">🧹</span>
+                    Clean Stats
+                </button>
             </div>
 
             <!-- Shorten URL Form -->
@@ -125,6 +129,56 @@
 
                 <!-- Stats Result Area -->
                 <div id="stats-result" class="result-area"></div>
+            </div>
+
+            <!-- Clean Stats Tab -->
+            <div id="clean-tab" class="tab-content">
+                <div class="clean-stats-section">
+                    <div class="section-header">
+                        <h3>
+                            <span class="label-icon">📈</span>
+                            Cleanup Statistics
+                        </h3>
+                        <button id="refresh-stats" class="btn btn-secondary" onclick="loadCleanupStats()">
+                            <span class="btn-icon">🔄</span>
+                            Refresh
+                        </button>
+                    </div>
+
+                    <div id="cleanup-stats" class="stats-area"></div>
+                </div>
+
+                <div class="clean-actions-section">
+                    <div class="section-header">
+                        <h3>
+                            <span class="label-icon">⚡</span>
+                            Cleanup Actions
+                        </h3>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="batch_size">
+                            <span class="label-icon">📦</span>
+                            Batch Size
+                        </label>
+                        <input type="number"
+                               id="batch_size"
+                               name="batch_size"
+                               placeholder="1000"
+                               value="1000"
+                               min="1"
+                               max="10000"
+                               class="input-field">
+                        <small class="help-text">Number of expired URLs to clean in one batch (1-10000)</small>
+                    </div>
+
+                    <button id="manual-cleanup" class="btn btn-warning" onclick="triggerManualCleanup()">
+                        <span class="btn-icon">🧹</span>
+                        Run Manual Cleanup
+                    </button>
+
+                    <div id="cleanup-result" class="result-area"></div>
+                </div>
             </div>
         </div>
 

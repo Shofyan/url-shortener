@@ -544,3 +544,195 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// Clean Stats functionality
+function loadCleanupStats() {
+    const statsDiv = document.getElementById('cleanup-stats');
+    statsDiv.innerHTML = '<div class="loading">Loading cleanup statistics...</div>';
+
+    fetch('/api/admin/cleanup/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.message);
+            }
+            displayCleanupStats(data);
+        })
+        .catch(error => {
+            statsDiv.innerHTML = `
+                <div class="error-card">
+                    <div class="error-header">
+                        <span>❌</span>
+                        <h3>Error Loading Stats</h3>
+                    </div>
+                    <p>${error.message}</p>
+                </div>
+            `;
+        });
+}
+
+function displayCleanupStats(stats) {
+    const statusColor = stats.is_running ? 'var(--success-color)' : 'var(--text-secondary)';
+    const statusText = stats.is_running ? 'Running' : 'Stopped';
+    const statusIcon = stats.is_running ? '🟢' : '🔴';
+
+    const lastCleanupTime = stats.last_cleanup_time ?
+        new Date(stats.last_cleanup_time).toLocaleString() :
+        'Never';
+
+    document.getElementById('cleanup-stats').innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-header">
+                    <span class="stat-icon">🔄</span>
+                    <span class="stat-label">Service Status</span>
+                </div>
+                <div class="stat-value" style="color: ${statusColor}">
+                    ${statusIcon} ${statusText}
+                </div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-header">
+                    <span class="stat-icon">🗑️</span>
+                    <span class="stat-label">Total Cleaned</span>
+                </div>
+                <div class="stat-value">${stats.total_cleaned.toLocaleString()}</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-header">
+                    <span class="stat-icon">📦</span>
+                    <span class="stat-label">Last Batch Size</span>
+                </div>
+                <div class="stat-value">${stats.last_batch_size}</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-header">
+                    <span class="stat-icon">✅</span>
+                    <span class="stat-label">Successful Runs</span>
+                </div>
+                <div class="stat-value">${stats.successful_runs}</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-header">
+                    <span class="stat-icon">❌</span>
+                    <span class="stat-label">Failed Runs</span>
+                </div>
+                <div class="stat-value">${stats.failed_runs}</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-header">
+                    <span class="stat-icon">⏱️</span>
+                    <span class="stat-label">Avg Cleanup Time</span>
+                </div>
+                <div class="stat-value">${Math.round(stats.average_cleanup_ms)}ms</div>
+            </div>
+
+            <div class="stat-item span-2">
+                <div class="stat-header">
+                    <span class="stat-icon">🕒</span>
+                    <span class="stat-label">Last Cleanup</span>
+                </div>
+                <div class="stat-value">${lastCleanupTime}</div>
+            </div>
+        </div>
+    `;
+}
+
+function triggerManualCleanup() {
+    const batchSize = document.getElementById('batch_size').value || 1000;
+    const resultDiv = document.getElementById('cleanup-result');
+    const button = document.getElementById('manual-cleanup');
+
+    // Disable button and show loading
+    button.disabled = true;
+    button.innerHTML = '<span class="btn-icon">⏳</span>Running Cleanup...';
+
+    resultDiv.innerHTML = '<div class="loading">Running manual cleanup...</div>';
+
+    fetch('/api/admin/cleanup/manual', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            batch_size: parseInt(batchSize)
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.message);
+            }
+
+            resultDiv.innerHTML = `
+                <div class="result-card">
+                    <div class="result-header">
+                        <span style="font-size: 2rem;">✅</span>
+                        <h3>Cleanup Completed Successfully!</h3>
+                    </div>
+
+                    <div class="result-item">
+                        <span class="result-label">URLs Cleaned</span>
+                        <div class="result-value">
+                            <span>${data.cleaned_count} expired URLs removed</span>
+                        </div>
+                    </div>
+
+                    <div class="result-item">
+                        <span class="result-label">Cleanup Duration</span>
+                        <div class="result-value">
+                            <span>${Math.round(data.duration_ms)}ms</span>
+                        </div>
+                    </div>
+
+                    <div class="result-item">
+                        <span class="result-label">Batch Size</span>
+                        <div class="result-value">
+                            <span>${data.batch_size}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            showNotification(`Successfully cleaned ${data.cleaned_count} expired URLs! 🧹`, 'success');
+
+            // Refresh stats after cleanup
+            setTimeout(loadCleanupStats, 1000);
+        })
+        .catch(error => {
+            resultDiv.innerHTML = `
+                <div class="error-card">
+                    <div class="error-header">
+                        <span>❌</span>
+                        <h3>Cleanup Failed</h3>
+                    </div>
+                    <p>${error.message}</p>
+                </div>
+            `;
+
+            showNotification('Cleanup operation failed', 'error');
+        })
+        .finally(() => {
+            // Re-enable button
+            button.disabled = false;
+            button.innerHTML = '<span class="btn-icon">🧹</span>Run Manual Cleanup';
+        });
+}
+
+// Auto-load cleanup stats when clean tab is opened
+document.addEventListener('DOMContentLoaded', function() {
+    // Override the switchTab function to include cleanup stats loading
+    const originalSwitchTab = window.switchTab;
+    window.switchTab = function(tabName) {
+        originalSwitchTab(tabName);
+
+        if (tabName === 'clean') {
+            loadCleanupStats();
+        }
+    };
+});
