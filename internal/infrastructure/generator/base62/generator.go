@@ -8,7 +8,9 @@ import (
 	"github.com/Shofyan/url-shortener/internal/domain/valueobject"
 )
 
-const base62Chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const base62Chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"
+
+// Excluded characters: 0, O, l, 1 for readability compliance
 
 // Generator implements the ShortKeyGenerator interface using Base62 encoding
 type Generator struct{}

@@ -190,11 +190,10 @@ func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string)
 		return "", ErrURLExpired
 	}
 
-	// Increment visit count asynchronously
-	go func() {
-		url.IncrementVisit()
-		_ = uc.urlRepo.Update(context.Background(), url)
-	}()
+	// Thread-safe increment visit count and update last accessed time
+	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
+		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+	}
 
 	// Update cache
 	cacheTTL := uc.defaultTTL
@@ -231,6 +230,10 @@ func (uc *ShortenURLUseCase) GetStats(ctx context.Context, shortKeyStr string) (
 
 	if url.ExpiresAt != nil {
 		resp.ExpiresAt = url.ExpiresAt.Format(time.RFC3339)
+	}
+
+	if url.LastAccessedAt != nil {
+		resp.LastAccessedAt = url.LastAccessedAt.Format(time.RFC3339)
 	}
 
 	return resp, nil

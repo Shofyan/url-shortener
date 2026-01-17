@@ -31,8 +31,8 @@ func NewURLRepository(db *sql.DB) *URLRepository {
 // Save saves a new URL mapping
 func (r *URLRepository) Save(ctx context.Context, url *entity.URL) error {
 	query := `
-		INSERT INTO urls (id, short_key, long_url, created_at, expires_at, visit_count)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO urls (id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -42,6 +42,7 @@ func (r *URLRepository) Save(ctx context.Context, url *entity.URL) error {
 		url.CreatedAt,
 		url.ExpiresAt,
 		url.VisitCount,
+		url.LastAccessedAt,
 	)
 
 	return err
@@ -50,7 +51,7 @@ func (r *URLRepository) Save(ctx context.Context, url *entity.URL) error {
 // FindByShortKey retrieves a URL by its short key
 func (r *URLRepository) FindByShortKey(ctx context.Context, shortKey *valueobject.ShortKey) (*entity.URL, error) {
 	query := `
-		SELECT id, short_key, long_url, created_at, expires_at, visit_count
+		SELECT id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at
 		FROM urls
 		WHERE short_key = $1
 	`
@@ -58,15 +59,16 @@ func (r *URLRepository) FindByShortKey(ctx context.Context, shortKey *valueobjec
 	row := r.db.QueryRowContext(ctx, query, shortKey.Value())
 
 	var (
-		id          int64
-		shortKeyStr string
-		longURLStr  string
-		createdAt   time.Time
-		expiresAt   sql.NullTime
-		visitCount  int64
+		id             int64
+		shortKeyStr    string
+		longURLStr     string
+		createdAt      time.Time
+		expiresAt      sql.NullTime
+		visitCount     int64
+		lastAccessedAt sql.NullTime
 	)
 
-	err := row.Scan(&id, &shortKeyStr, &longURLStr, &createdAt, &expiresAt, &visitCount)
+	err := row.Scan(&id, &shortKeyStr, &longURLStr, &createdAt, &expiresAt, &visitCount, &lastAccessedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
@@ -89,13 +91,17 @@ func (r *URLRepository) FindByShortKey(ctx context.Context, shortKey *valueobjec
 		url.ExpiresAt = &expiresAt.Time
 	}
 
+	if lastAccessedAt.Valid {
+		url.LastAccessedAt = &lastAccessedAt.Time
+	}
+
 	return url, nil
 }
 
 // FindByLongURL retrieves a URL by its long URL
 func (r *URLRepository) FindByLongURL(ctx context.Context, longURL *valueobject.LongURL) (*entity.URL, error) {
 	query := `
-		SELECT id, short_key, long_url, created_at, expires_at, visit_count
+		SELECT id, short_key, long_url, created_at, expires_at, visit_count, last_accessed_at
 		FROM urls
 		WHERE long_url = $1
 		ORDER BY created_at DESC
@@ -105,15 +111,16 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL *valueobject.
 	row := r.db.QueryRowContext(ctx, query, longURL.Value())
 
 	var (
-		id          int64
-		shortKeyStr string
-		longURLStr  string
-		createdAt   time.Time
-		expiresAt   sql.NullTime
-		visitCount  int64
+		id             int64
+		shortKeyStr    string
+		longURLStr     string
+		createdAt      time.Time
+		expiresAt      sql.NullTime
+		visitCount     int64
+		lastAccessedAt sql.NullTime
 	)
 
-	err := row.Scan(&id, &shortKeyStr, &longURLStr, &createdAt, &expiresAt, &visitCount)
+	err := row.Scan(&id, &shortKeyStr, &longURLStr, &createdAt, &expiresAt, &visitCount, &lastAccessedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
@@ -134,6 +141,10 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL *valueobject.
 
 	if expiresAt.Valid {
 		url.ExpiresAt = &expiresAt.Time
+	}
+
+	if lastAccessedAt.Valid {
+		url.LastAccessedAt = &lastAccessedAt.Time
 	}
 
 	return url, nil
@@ -202,6 +213,32 @@ func (r *URLRepository) ExistsByShortKey(ctx context.Context, shortKey *valueobj
 	}
 
 	return exists, nil
+}
+
+// IncrementVisitCount atomically increments visit count and updates last_accessed_at
+func (r *URLRepository) IncrementVisitCount(ctx context.Context, shortKey *valueobject.ShortKey) error {
+	query := `
+		UPDATE urls 
+		SET visit_count = visit_count + 1,
+			last_accessed_at = CURRENT_TIMESTAMP 
+		WHERE short_key = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, shortKey.Value())
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
 }
 
 // NewDB creates a new database connection

@@ -8,12 +8,13 @@ import (
 
 // URL represents the URL entity in the domain
 type URL struct {
-	ID         int64
-	ShortKey   *valueobject.ShortKey
-	LongURL    *valueobject.LongURL
-	CreatedAt  time.Time
-	ExpiresAt  *time.Time
-	VisitCount int64
+	ID             int64
+	ShortKey       *valueobject.ShortKey
+	LongURL        *valueobject.LongURL
+	CreatedAt      time.Time
+	ExpiresAt      *time.Time
+	VisitCount     int64
+	LastAccessedAt *time.Time
 }
 
 // NewURL creates a new URL entity
@@ -38,6 +39,19 @@ func (u *URL) IsExpired() bool {
 		return false
 	}
 	return time.Now().After(*u.ExpiresAt)
+}
+
+// IncrementVisit increments the visit count and updates last accessed time
+func (u *URL) IncrementVisit() {
+	u.VisitCount++
+	now := time.Now()
+	u.LastAccessedAt = &now
+}
+
+// UpdateLastAccessed updates the last accessed timestamp
+func (u *URL) UpdateLastAccessed() {
+	now := time.Now()
+	u.LastAccessedAt = &now
 }
 
 // IncrementVisit increments the visit count

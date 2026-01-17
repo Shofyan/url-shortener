@@ -26,4 +26,7 @@ type URLRepository interface {
 
 	// ExistsByShortKey checks if a short key already exists
 	ExistsByShortKey(ctx context.Context, shortKey *valueobject.ShortKey) (bool, error)
+
+	// IncrementVisitCount atomically increments visit count and updates last_accessed_at
+	IncrementVisitCount(ctx context.Context, shortKey *valueobject.ShortKey) error
 }
