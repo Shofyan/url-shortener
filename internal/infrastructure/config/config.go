@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/Shofyan/url-shortener/internal/domain/service"
 )
 
-// Config holds all application configuration
+// Config holds all application configuration.
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
@@ -16,7 +18,7 @@ type Config struct {
 	App      AppConfig
 }
 
-// ServerConfig holds server configuration
+// ServerConfig holds server configuration.
 type ServerConfig struct {
 	Port         string
 	ReadTimeout  time.Duration
@@ -24,7 +26,7 @@ type ServerConfig struct {
 	IdleTimeout  time.Duration
 }
 
-// DatabaseConfig holds database configuration
+// DatabaseConfig holds database configuration.
 type DatabaseConfig struct {
 	Host            string
 	Port            string
@@ -37,7 +39,7 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration
 }
 
-// RedisConfig holds Redis configuration
+// RedisConfig holds Redis configuration.
 type RedisConfig struct {
 	Host         string
 	Port         string
@@ -47,16 +49,23 @@ type RedisConfig struct {
 	MinIdleConns int
 }
 
-// AppConfig holds application-specific configuration
+// AppConfig holds application-specific configuration.
 type AppConfig struct {
 	BaseURL           string
 	CacheTTL          time.Duration
 	SnowflakeNodeID   int64
 	RateLimitRequests int
 	RateLimitWindow   time.Duration
+	GinMode           string
+	// Cleanup configuration for expired URLs
+	CleanupEnabled     bool
+	CleanupInterval    time.Duration
+	CleanupBatchSize   int
+	CleanupBufferTime  time.Duration
+	CleanupMaxDuration time.Duration
 }
 
-// Load loads configuration from file and environment variables
+// Load loads configuration from file and environment variables.
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -116,15 +125,34 @@ func setDefaults() {
 	viper.SetDefault("app.snowflakenodeid", 1)
 	viper.SetDefault("app.ratelimitrequests", 100)
 	viper.SetDefault("app.ratelimitwindow", "1m")
+	viper.SetDefault("app.ginmode", "release")
+
+	// Cleanup defaults
+	viper.SetDefault("app.cleanupenabled", true)
+	viper.SetDefault("app.cleanupinterval", "15m")
+	viper.SetDefault("app.cleanupbatchsize", 1000)
+	viper.SetDefault("app.cleanupbuffertime", "1h")
+	viper.SetDefault("app.cleanupmaxduration", "5m")
 }
 
-// GetDSN returns the PostgreSQL connection string
+// GetDSN returns the PostgreSQL connection string.
 func (c *DatabaseConfig) GetDSN() string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode)
 }
 
-// GetRedisAddr returns the Redis address
+// GetRedisAddr returns the Redis address.
 func (c *RedisConfig) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%s", c.Host, c.Port)
+}
+
+// GetCleanupConfig creates a cleanup service configuration from app config.
+func (c *AppConfig) GetCleanupConfig() *service.CleanupConfig {
+	return &service.CleanupConfig{
+		Enabled:            c.CleanupEnabled,
+		CleanupInterval:    c.CleanupInterval,
+		BatchSize:          c.CleanupBatchSize,
+		BufferTime:         c.CleanupBufferTime,
+		MaxCleanupDuration: c.CleanupMaxDuration,
+	}
 }

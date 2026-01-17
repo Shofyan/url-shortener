@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"name": "URL Shortener API",
-		"description": "A high-performance URL shortener service built with Go, following Clean Architecture and DDD principles.\n\n## Features\n- Shorten long URLs\n- Custom short keys\n- URL expiration\n- Visit tracking\n- Rate limiting\n\n## Base URL\nhttp://localhost:8080",
+		"description": "A high-performance URL shortener service built with Go, following Clean Architecture and DDD principles.\n\n## Features\n- Shorten long URLs\n- Custom short keys\n- URL expiration\n- Visit tracking\n- Rate limiting\n\n## API Endpoints\n- POST / - Create short URL\n- GET /s/:key - Redirect to long URL\n- GET /stats/:key - Get URL statistics\n- GET /health - Health check\n- GET /web - Web UI\n\n## Base URL\nhttp://localhost:8080",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -110,16 +110,15 @@
 					"raw": "{\n    \"long_url\": \"https://www.example.com/very/long/url/path/that/needs/to/be/shortened\"\n}"
 				},
 				"url": {
-					"raw": "{{base_url}}/api/shorten",
+					"raw": "{{base_url}}/",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"api",
-						"shorten"
+						""
 					]
 				},
-				"description": "Create a short URL from a long URL. The service will generate a unique short key automatically."
+				"description": "Create a short URL from a long URL. Send a POST request to the root endpoint (/) with a JSON payload containing the long_url. The service will generate a unique short key automatically. Optional parameters: custom_key, expires_in."
 			},
 			"response": [
 				{
@@ -137,13 +136,12 @@
 							"raw": "{\n    \"long_url\": \"https://www.example.com/very/long/url\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/shorten",
+							"raw": "{{base_url}}/",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
-								"shorten"
+								""
 							]
 						}
 					},
@@ -194,13 +192,12 @@
 					"raw": "{\n    \"long_url\": \"https://www.github.com/Shofyan/url-shortener\",\n    \"custom_key\": \"mylink\"\n}"
 				},
 				"url": {
-					"raw": "{{base_url}}/api/shorten",
+					"raw": "{{base_url}}/",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"api",
-						"shorten"
+						""
 					]
 				},
 				"description": "Create a short URL with a custom short key of your choice."
@@ -221,13 +218,12 @@
 							"raw": "{\n    \"long_url\": \"https://www.github.com/Shofyan/url-shortener\",\n    \"custom_key\": \"mylink\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/shorten",
+							"raw": "{{base_url}}/",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
-								"shorten"
+								""
 							]
 						}
 					},
@@ -258,13 +254,12 @@
 							"raw": "{\n    \"long_url\": \"https://www.example.com\",\n    \"custom_key\": \"mylink\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/shorten",
+							"raw": "{{base_url}}/",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
-								"shorten"
+								""
 							]
 						}
 					},
@@ -315,13 +310,12 @@
 					"raw": "{\n    \"long_url\": \"https://www.example.com/temporary-link\",\n    \"expires_in\": 86400\n}"
 				},
 				"url": {
-					"raw": "{{base_url}}/api/shorten",
+					"raw": "{{base_url}}/",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"api",
-						"shorten"
+						""
 					]
 				},
 				"description": "Create a short URL that expires after a specified time (in seconds). Example: 86400 = 24 hours."
@@ -342,13 +336,12 @@
 							"raw": "{\n    \"long_url\": \"https://www.example.com/temporary-link\",\n    \"expires_in\": 86400\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/shorten",
+							"raw": "{{base_url}}/",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
-								"shorten"
+								""
 							]
 						}
 					},
@@ -385,15 +378,16 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/{{short_key}}",
+					"raw": "{{base_url}}/s/{{short_key}}",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
+						"s",
 						"{{short_key}}"
 					]
 				},
-				"description": "Redirect to the original long URL using the short key. Returns a 302 redirect."
+				"description": "Redirect to the original long URL using the short key. Access via GET /s/:shortKey where :shortKey is the generated or custom key. Returns a 302 redirect to the original URL."
 			},
 			"response": [
 				{
@@ -402,11 +396,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/abc123",
+							"raw": "{{base_url}}/s/abc123",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"s",
 								"abc123"
 							]
 						}
@@ -429,11 +424,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/invalid",
+							"raw": "{{base_url}}/s/invalid",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"s",
 								"invalid"
 							]
 						}
@@ -456,11 +452,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/expired",
+							"raw": "{{base_url}}/s/expired",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"s",
 								"expired"
 							]
 						}
@@ -506,17 +503,16 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/api/stats/{{short_key}}",
+					"raw": "{{base_url}}/stats/{{short_key}}",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"api",
 						"stats",
 						"{{short_key}}"
 					]
 				},
-				"description": "Get statistics for a short URL including visit count and creation time."
+				"description": "Get statistics for a short URL including visit count, creation time, and expiration (if set). Access via GET /stats/:shortKey where :shortKey is the generated or custom key."
 			},
 			"response": [
 				{
@@ -525,12 +521,11 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/stats/abc123",
+							"raw": "{{base_url}}/stats/abc123",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
 								"stats",
 								"abc123"
 							]
@@ -554,12 +549,11 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/stats/invalid",
+							"raw": "{{base_url}}/stats/invalid",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
 								"stats",
 								"invalid"
 							]
@@ -607,13 +601,12 @@
 					"raw": "{\n    \"long_url\": \"not-a-valid-url\"\n}"
 				},
 				"url": {
-					"raw": "{{base_url}}/api/shorten",
+					"raw": "{{base_url}}/",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"api",
-						"shorten"
+						""
 					]
 				},
 				"description": "Example of error handling when an invalid URL is provided."
@@ -634,13 +627,12 @@
 							"raw": "{\n    \"long_url\": \"not-a-valid-url\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/shorten",
+							"raw": "{{base_url}}/",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"api",
-								"shorten"
+								""
 							]
 						}
 					},
@@ -655,6 +647,69 @@
 					],
 					"cookie": [],
 					"body": "{\n    \"error\": \"invalid_request\",\n    \"message\": \"invalid URL format\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Web UI",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response is HTML\", function () {",
+							"    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/web",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"web"
+					]
+				},
+				"description": "Access the web user interface for the URL shortener."
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/web",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"web"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "html",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "text/html; charset=utf-8"
+						}
+					],
+					"cookie": [],
+					"body": "<!DOCTYPE html>\n<html>\n<head>\n    <title>URL Shortener</title>\n</head>\n<body>\n    <!-- Web UI content -->\n</body>\n</html>"
 				}
 			]
 		}

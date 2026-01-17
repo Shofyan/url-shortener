@@ -29,20 +29,23 @@ func main() {
 		"host=localhost port=5432 user=postgres password=postgres dbname=urlshortener sslmode=disable")
 
 	log.Println("Connecting to database...")
+
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	log.Println("✓ Database connection successful")
+
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.Printf("Failed to close database connection: %v", err)
 		}
 	}()
-
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
-	log.Println("✓ Database connection successful")
 
 	// Create migrations table if it doesn't exist
 	if err := createMigrationsTable(db); err != nil {
@@ -68,10 +71,12 @@ func main() {
 
 	// Apply migrations
 	log.Printf("Found %d pending migration(s)\n", len(migrations))
+
 	for _, m := range migrations {
 		if err := applyMigration(db, m); err != nil {
 			log.Fatalf("Failed to apply migration %s: %v", m.filename, err)
 		}
+
 		log.Printf("✓ Applied migration: %s", m.filename)
 	}
 
@@ -87,15 +92,18 @@ func createMigrationsTable(db *sql.DB) error {
 	`, migrationsTable)
 
 	_, err := db.Exec(query)
+
 	return err
 }
 
 func getAppliedMigrations(db *sql.DB) (map[string]bool, error) {
 	query := fmt.Sprintf("SELECT version FROM %s", migrationsTable)
+
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		err = rows.Close()
 		if err != nil {
@@ -104,11 +112,13 @@ func getAppliedMigrations(db *sql.DB) (map[string]bool, error) {
 	}()
 
 	applied := make(map[string]bool)
+
 	for rows.Next() {
 		var version string
 		if err := rows.Scan(&version); err != nil {
 			return nil, err
 		}
+
 		applied[version] = true
 	}
 
@@ -122,6 +132,7 @@ func getPendingMigrations(appliedMigrations map[string]bool) ([]migration, error
 	}
 
 	var migrations []migration
+
 	for _, file := range files {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".sql") {
 			continue
@@ -158,6 +169,7 @@ func applyMigration(db *sql.DB, m migration) error {
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		err = tx.Rollback()
 		if err != nil && err != sql.ErrTxDone {
@@ -184,5 +196,6 @@ func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+
 	return defaultValue
 }

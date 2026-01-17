@@ -1,20 +1,31 @@
 package router
 
 import (
+	"os"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/Shofyan/url-shortener/internal/infrastructure/config"
 	"github.com/Shofyan/url-shortener/internal/interfaces/http/handler"
 	"github.com/Shofyan/url-shortener/internal/interfaces/http/middleware"
-	"github.com/gin-gonic/gin"
 )
 
-// SetupRouter configures all routes and middleware
-func SetupRouter(urlHandler *handler.URLHandler, webHandler *handler.WebHandler, rateLimiter *middleware.RateLimiter) *gin.Engine {
-	// Set Gin to release mode in production
-	// gin.SetMode(gin.ReleaseMode)
+// SetupRouter configures all routes and middleware.
+func SetupRouter(cfg *config.Config, urlHandler *handler.URLHandler, webHandler *handler.WebHandler, rateLimiter *middleware.RateLimiter) *gin.Engine {
+	// Set Gin mode - prioritize environment variable, then config, then default to release
+	if mode := os.Getenv("GIN_MODE"); mode != "" {
+		gin.SetMode(mode)
+	} else if cfg.App.GinMode != "" {
+		gin.SetMode(cfg.App.GinMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	router := gin.New()
 
 	// Global middleware
 	router.Use(middleware.Recovery())
+	router.Use(middleware.ProcessingTime())
 	router.Use(middleware.Logger())
 	router.Use(middleware.CORS())
 
@@ -24,25 +35,29 @@ func SetupRouter(urlHandler *handler.URLHandler, webHandler *handler.WebHandler,
 	// Serve static files
 	router.Static("/static", "web/static")
 
-	// Web UI routes
-	router.GET("/", webHandler.Index)
-
 	// Health check endpoint (no rate limiting)
 	router.GET("/health", urlHandler.HealthCheck)
 
-	// API routes with rate limiting
-	api := router.Group("/api")
-	api.Use(rateLimiter.Limit())
-	{
-		// Create short URL
-		api.POST("/shorten", urlHandler.ShortenURL)
+	// URL Creation endpoint (POST /)
+	router.POST("/", rateLimiter.Limit(), urlHandler.ShortenURL)
 
-		// Get URL statistics
-		api.GET("/stats/:shortKey", urlHandler.GetStats)
-	}
+	// Short URL redirect (GET /s/{short_code})
+	router.GET("/s/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
 
-	// Short URL redirect (with rate limiting)
-	router.GET("/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
+	// Short URL redirect (HEAD /s/{short_code}) - for curl -I and similar tools
+	router.HEAD("/s/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
+
+	// Stats endpoint (GET /stats/{short_code})
+	router.GET("/stats/:shortKey", urlHandler.GetStats)
+
+	// Admin routes (no rate limiting for internal monitoring)
+	admin := router.Group("/api/admin")
+	admin.GET("/cleanup/stats", urlHandler.GetCleanupStats)
+	admin.POST("/cleanup/manual", urlHandler.TriggerManualCleanup)
+
+	// Web UI routes (serve after API routes to avoid conflicts)
+	router.GET("/web", webHandler.Index)
+	router.GET("/web/*filepath", webHandler.Index)
 
 	return router
 }

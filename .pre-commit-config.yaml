@@ -1,0 +1,65 @@
+repos:
+  # Go development hooks
+  - repo: local
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint
+        description: Fast linters runner for Go
+        entry: golangci-lint
+        args: [run, --fix]
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-fmt
+        name: go-fmt
+        description: Gofmt formats Go programs
+        entry: gofmt
+        args: [-w, -s]
+        language: system
+        types: [go]
+
+      - id: go-mod-tidy
+        name: go-mod-tidy
+        description: Tidy Go module dependencies
+        entry: go
+        args: [mod, tidy]
+        language: system
+        types: [go]
+        pass_filenames: false
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        description: Trim trailing whitespace
+        entry: trailing-whitespace-fixer
+        language: python
+        types: [text]
+
+      - id: end-of-file-fixer
+        name: fix end of files
+        description: Makes sure files end in a newline and only a newline
+        entry: end-of-file-fixer
+        language: python
+        types: [text]
+
+      - id: check-yaml
+        name: check yaml
+        description: Attempts to load all yaml files to verify syntax
+        entry: check-yaml
+        language: python
+        types: [yaml]
+
+      - id: check-json
+        name: check json
+        description: Attempts to load all json files to verify syntax
+        entry: check-json
+        language: python
+        types: [json]
+
+# Global pre-commit configuration
+default_stages: [pre-commit]
+fail_fast: false

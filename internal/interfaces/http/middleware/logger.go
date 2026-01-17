@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Logger middleware logs request details
+// Logger middleware logs request details.
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -27,13 +27,12 @@ func Logger() gin.HandlerFunc {
 			}
 		}
 
-		log.Printf("[%s] %s %s | Status: %d | Latency: %v | IP: %s",
+		log.Printf("[%s] %s %s | Status: %d | Latency: %v",
 			c.Request.Method,
 			path,
 			query,
 			c.Writer.Status(),
 			latency,
-			c.ClientIP(),
 		)
 	}
 }

@@ -7,7 +7,9 @@ import (
 )
 
 var (
-	ErrInvalidURL      = errors.New("invalid URL format")
+	// ErrInvalidURL is returned when the provided URL format is invalid.
+	ErrInvalidURL = errors.New("invalid URL format")
+	// ErrEmptyURL is returned when the provided URL is empty.
 	ErrEmptyURL        = errors.New("URL cannot be empty")
 	ErrURLTooLong      = errors.New("URL exceeds maximum length")
 	ErrInvalidShortKey = errors.New("invalid short key format")
@@ -15,16 +17,18 @@ var (
 )
 
 const (
-	MaxURLLength      = 2048
+	// MaxURLLength defines the maximum allowed length for a URL.
+	MaxURLLength = 2048
+	// MaxShortKeyLength defines the maximum allowed length for a short key.
 	MaxShortKeyLength = 12
 )
 
-// LongURL represents the original URL value object
+// LongURL represents the original URL value object.
 type LongURL struct {
 	value string
 }
 
-// NewLongURL creates a new LongURL value object with validation
+// NewLongURL creates a new LongURL value object with validation.
 func NewLongURL(rawURL string) (*LongURL, error) {
 	if rawURL == "" {
 		return nil, ErrEmptyURL
@@ -48,17 +52,17 @@ func NewLongURL(rawURL string) (*LongURL, error) {
 	return &LongURL{value: rawURL}, nil
 }
 
-// Value returns the string value of the LongURL
+// Value returns the string value of the LongURL.
 func (l *LongURL) Value() string {
 	return l.value
 }
 
-// ShortKey represents the shortened URL key value object
+// ShortKey represents the shortened URL key value object.
 type ShortKey struct {
 	value string
 }
 
-// NewShortKey creates a new ShortKey value object with validation
+// NewShortKey creates a new ShortKey value object with validation.
 func NewShortKey(key string) (*ShortKey, error) {
 	if key == "" {
 		return nil, ErrEmptyShortKey
@@ -76,12 +80,12 @@ func NewShortKey(key string) (*ShortKey, error) {
 	return &ShortKey{value: key}, nil
 }
 
-// Value returns the string value of the ShortKey
+// Value returns the string value of the ShortKey.
 func (s *ShortKey) Value() string {
 	return s.value
 }
 
-// isAlphanumeric checks if a string contains only alphanumeric characters, hyphens, and underscores
+// isAlphanumeric checks if a string contains only alphanumeric characters, hyphens, and underscores.
 func isAlphanumeric(s string) bool {
 	for _, char := range s {
 		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') && (char < '0' || char > '9') && char != '-' && char != '_' {
@@ -92,10 +96,11 @@ func isAlphanumeric(s string) bool {
 	return true
 }
 
-// NormalizeURL normalizes a URL by ensuring it has a scheme
+// NormalizeURL normalizes a URL by ensuring it has a scheme.
 func NormalizeURL(rawURL string) string {
 	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
 		return "https://" + rawURL
 	}
+
 	return rawURL
 }
