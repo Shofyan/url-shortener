@@ -25,7 +25,7 @@ function handleShortenResponse(event) {
     if (xhr.status === 201) {
         // Success
         const baseUrl = window.location.origin;
-        const shortUrl = `${baseUrl}/${response.short_key}`;
+        const shortUrl = `${baseUrl}/s/${response.short_key}`;
 
         document.getElementById('result').innerHTML = `
             <div class="result-card">
@@ -122,7 +122,7 @@ function submitStatsForm(event) {
     }
 
     const form = document.getElementById('stats-form');
-    const url = `/api/stats/${shortKey}`;
+    const url = `/stats/${shortKey}`;
 
     // Trigger HTMX GET request and handle response
     fetch(url)
@@ -149,7 +149,7 @@ function submitStatsForm(event) {
 // Display stats result in a nice visual format
 function displayStatsResult(response) {
     const baseUrl = window.location.origin;
-    const shortUrl = `${baseUrl}/${response.short_key}`;
+    const shortUrl = `${baseUrl}/s/${response.short_key}`;
 
     const expiresDate = response.expires_at ? new Date(response.expires_at) : null;
     const createdDate = new Date(response.created_at);
