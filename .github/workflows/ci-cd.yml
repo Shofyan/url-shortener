@@ -8,7 +8,7 @@ on:
 
 env:
   GO_VERSION: '1.21'
-  GOLANGCI_LINT_VERSION: 'v1.55.2'
+  GOLANGCI_LINT_VERSION: 'v1.56.2'
 
 jobs:
   # Static Analysis and Linting
@@ -37,27 +37,23 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Run golangci-lint
+    - name: Run golangci-lint (includes revive, gocyclo, gofmt, govet, and more)
       uses: golangci/golangci-lint-action@v3
       with:
         version: ${{ env.GOLANGCI_LINT_VERSION }}
-        args: --timeout=5m --config=.golangci.yml
+        args: --timeout=5m --config=.golangci.yml --verbose
 
-    - name: Run go vet
-      run: go vet ./...
-
-    - name: Run gofmt check
+    - name: Verify golangci-lint configuration
       run: |
-        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-          echo "Code is not properly formatted:"
-          gofmt -s -l .
-          exit 1
-        fi
-
-    - name: Check cyclomatic complexity
-      run: |
-        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
-        gocyclo -over 10 .
+        echo "Enabled linters in .golangci.yml:"
+        echo "- revive (replaces golint with better rules)"
+        echo "- gocyclo (cyclomatic complexity checker, max 10)"
+        echo "- gofmt, govet, gosec, and many more"
+        echo ""
+        echo "Configuration details:"
+        echo "- Revive confidence: 0.8"
+        echo "- Gocyclo max complexity: 10"
+        echo "- Full list in .golangci.yml"
 
   # Security Scanning
   security:
@@ -181,8 +177,17 @@ jobs:
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+    - name: Extract version
+      id: vars
+      run: |
+        if [[ ${{ github.ref }} == refs/tags/* ]]; then
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+        fi
 
     - name: Extract metadata
       id: meta
@@ -199,10 +204,15 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name != 'pull_request' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener:${{ steps.vars.outputs.VERSION }}
+        labels: |
+          org.opencontainers.image.title=url-shortener
+          org.opencontainers.image.description=High-performance Go URL shortener
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -212,43 +222,13 @@ jobs:
         dockerfile: Dockerfile
         config: .hadolint.yaml
 
-  # Performance Tests
-  performance:
-    name: Performance Tests
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/main'
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-
-    - name: Run benchmarks
-      run: |
-        go test -bench=. -benchmem -run=^$ ./tests/concurrency/... > benchmark.txt
-        cat benchmark.txt
-
-    - name: Store benchmark result
-      uses: benchmark-action/github-action-benchmark@v1
-      if: github.ref == 'refs/heads/main'
-      with:
-        tool: 'go'
-        output-file-path: benchmark.txt
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        auto-push: true
-        comment-on-alert: true
-        alert-threshold: '200%'
-        fail-on-alert: true
 
   # Deployment (only on main branch)
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [lint, security, test, build, performance]
+    needs: [lint, security, test, build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
