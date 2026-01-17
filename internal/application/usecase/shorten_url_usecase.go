@@ -240,15 +240,31 @@ func (uc *ShortenURLUseCase) GetLongURL(ctx context.Context, shortKeyStr string)
 		return "", err
 	}
 
+	var longURL string
+
 	// Phase 1: Try structured cache lookup first
-	if longURL, err := uc.tryGetFromCache(ctx, shortKey); err != nil {
+	if longURL, err = uc.tryGetFromCache(ctx, shortKey); err != nil {
 		return "", err
 	} else if longURL != "" {
+		// Cache hit - increment visit count once and return
+		if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
+			log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+		}
+
 		return longURL, nil
 	}
 
 	// Phase 2-4: Cache miss - handle database lookup and caching
-	return uc.handleCacheMiss(ctx, shortKey)
+	if longURL, err = uc.handleCacheMiss(ctx, shortKey); err != nil {
+		return "", err
+	}
+
+	// Cache miss resolved - increment visit count once and return
+	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
+		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
+	}
+
+	return longURL, nil
 }
 
 // tryGetFromCache attempts to retrieve URL from cache, returns empty string if cache miss.
@@ -277,11 +293,7 @@ func (uc *ShortenURLUseCase) tryGetFromCache(ctx context.Context, shortKey *valu
 		return "", ErrURLExpired
 	}
 
-	// Cache hit - increment visit count and return
-	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
-		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
-	}
-
+	// Cache hit - return URL (visit count will be incremented by caller)
 	return cacheEntry.LongURL, nil
 }
 
@@ -330,11 +342,7 @@ func (uc *ShortenURLUseCase) cacheValidURL(ctx context.Context, shortKey *valueo
 
 	_ = uc.cacheRepo.SetCacheEntry(ctx, shortKey.Value(), cacheEntry, cacheTTL)
 
-	// Increment visit count (fire-and-forget)
-	if err := uc.urlRepo.IncrementVisitCount(ctx, shortKey); err != nil {
-		log.Printf("Warning: Failed to increment visit count for %s: %v", shortKey.Value(), err)
-	}
-
+	// Return URL (visit count will be incremented by caller)
 	return longURL, nil
 }
 
