@@ -44,6 +44,9 @@ func SetupRouter(cfg *config.Config, urlHandler *handler.URLHandler, webHandler 
 	// Short URL redirect (GET /s/{short_code})
 	router.GET("/s/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
 
+	// Short URL redirect (HEAD /s/{short_code}) - for curl -I and similar tools
+	router.HEAD("/s/:shortKey", rateLimiter.Limit(), urlHandler.RedirectURL)
+
 	// Stats endpoint (GET /stats/{short_code})
 	router.GET("/stats/:shortKey", urlHandler.GetStats)
 
