@@ -41,6 +41,14 @@ func main() {
 
 	log.Println("✓ Database connection successful")
 
+	// Helper function to close DB and exit
+	fatalWithCleanup := func(db *sql.DB, format string, v ...interface{}) {
+		_ = db.Close() // Ignore error during cleanup before exit
+
+		log.Fatalf(format, v...)
+	}
+
+	// Defer close for normal exit
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.Printf("Failed to close database connection: %v", err)
@@ -49,19 +57,19 @@ func main() {
 
 	// Create migrations table if it doesn't exist
 	if err := createMigrationsTable(db); err != nil {
-		log.Fatalf("Failed to create migrations table: %v", err)
+		fatalWithCleanup(db, "Failed to create migrations table: %v", err)
 	}
 
 	// Get applied migrations
 	appliedMigrations, err := getAppliedMigrations(db)
 	if err != nil {
-		log.Fatalf("Failed to get applied migrations: %v", err)
+		fatalWithCleanup(db, "Failed to get applied migrations: %v", err)
 	}
 
 	// Get pending migrations
 	migrations, err := getPendingMigrations(appliedMigrations)
 	if err != nil {
-		log.Fatalf("Failed to get pending migrations: %v", err)
+		fatalWithCleanup(db, "Failed to get pending migrations: %v", err)
 	}
 
 	if len(migrations) == 0 {
@@ -74,7 +82,7 @@ func main() {
 
 	for _, m := range migrations {
 		if err := applyMigration(db, m); err != nil {
-			log.Fatalf("Failed to apply migration %s: %v", m.filename, err)
+			fatalWithCleanup(db, "Failed to apply migration %s: %v", m.filename, err)
 		}
 
 		log.Printf("✓ Applied migration: %s", m.filename)

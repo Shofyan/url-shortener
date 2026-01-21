@@ -1,3 +1,5 @@
+// Package usecase contains unit tests for URL shortener use cases,
+// including critical tests for hybrid expiration strategy.
 package usecase
 
 import (

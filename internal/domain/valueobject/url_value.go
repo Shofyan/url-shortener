@@ -10,10 +10,13 @@ var (
 	// ErrInvalidURL is returned when the provided URL format is invalid.
 	ErrInvalidURL = errors.New("invalid URL format")
 	// ErrEmptyURL is returned when the provided URL is empty.
-	ErrEmptyURL        = errors.New("URL cannot be empty")
-	ErrURLTooLong      = errors.New("URL exceeds maximum length")
+	ErrEmptyURL = errors.New("URL cannot be empty")
+	// ErrURLTooLong is returned when the URL exceeds the maximum allowed length.
+	ErrURLTooLong = errors.New("URL exceeds maximum length")
+	// ErrInvalidShortKey is returned when the provided short key format is invalid.
 	ErrInvalidShortKey = errors.New("invalid short key format")
-	ErrEmptyShortKey   = errors.New("short key cannot be empty")
+	// ErrEmptyShortKey is returned when the provided short key is empty.
+	ErrEmptyShortKey = errors.New("short key cannot be empty")
 )
 
 const (

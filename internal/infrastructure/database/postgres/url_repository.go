@@ -262,7 +262,10 @@ func (r *URLRepository) FindExpiredURLs(ctx context.Context, before time.Time, m
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+
+	defer func() {
+		_ = rows.Close() // Ignore error on deferred close
+	}()
 
 	var urls []*entity.URL
 

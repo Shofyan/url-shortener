@@ -167,11 +167,13 @@ func startServer(srv *http.Server, cleanupService *service.BackgroundURLCleanupS
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
+		cancel()
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
+
+	cancel()
 
 	log.Println("Server exited")
 }

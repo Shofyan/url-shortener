@@ -19,9 +19,11 @@ var (
 	// ErrURLNotFound is returned when the requested URL is not found in the system.
 	ErrURLNotFound = errors.New("URL not found")
 	// ErrURLExpired is returned when the URL has exceeded its expiration time.
-	ErrURLExpired      = errors.New("URL has expired")
+	ErrURLExpired = errors.New("URL has expired")
+	// ErrCustomKeyExists is returned when a custom short key already exists in the system.
 	ErrCustomKeyExists = errors.New("custom short key already exists")
-	ErrInternalError   = errors.New("internal server error")
+	// ErrInternalError is returned when an internal server error occurs.
+	ErrInternalError = errors.New("internal server error")
 )
 
 // ShortenURLUseCase handles URL shortening business logic.

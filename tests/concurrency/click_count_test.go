@@ -2,9 +2,10 @@ package concurrency_test
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"os"
 	"strings"
 	"sync"
@@ -36,7 +37,12 @@ func TestConcurrentClickCounting(t *testing.T) {
 		t.Logf("Error setting up test database: %v", err)
 		t.Skip("Database not available for concurrency test")
 	}
-	defer db.Close()
+
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("Failed to close database: %v", err)
+		}
+	}()
 
 	repo := postgres.NewURLRepository(db)
 	ctx := context.Background()
@@ -115,7 +121,12 @@ func TestConcurrentClickCountingWithRetries(t *testing.T) {
 	if err != nil {
 		t.Skip("Database not available for concurrency test")
 	}
-	defer db.Close()
+
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("Failed to close database: %v", err)
+		}
+	}()
 
 	repo := postgres.NewURLRepository(db)
 	ctx := context.Background()
@@ -215,7 +226,7 @@ func setupTestDB() (*sql.DB, error) {
 	db.SetConnMaxLifetime(time.Minute * 5)
 
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close() // Explicitly ignore error during cleanup
 		return nil, err
 	}
 
@@ -231,7 +242,8 @@ func insertTestURL(ctx context.Context, repo *postgres.URLRepository, shortKey *
 
 	// Create URL entity with a random ID to avoid conflicts
 	url := entity.NewURL(shortKey, longURL)
-	url.ID = rand.Int63n(1000000) + 1000000 // Generate a random ID in range 1M-2M
+	randomID, _ := rand.Int(rand.Reader, big.NewInt(1000000))
+	url.ID = randomID.Int64() + 1000000 // Generate a random ID in range 1M-2M
 	url.SetExpiration(time.Hour)
 
 	// Try to save, ignore conflicts (for test setup)
@@ -268,7 +280,12 @@ func BenchmarkIncrementVisitCount(b *testing.B) {
 	if err != nil {
 		b.Skip("Database not available for benchmark")
 	}
-	defer db.Close()
+
+	defer func() {
+		if err := db.Close(); err != nil {
+			b.Logf("Failed to close database: %v", err)
+		}
+	}()
 
 	repo := postgres.NewURLRepository(db)
 	ctx := context.Background()
